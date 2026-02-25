@@ -25,7 +25,6 @@ PYTHONPATH=src python -m dwarfboard_etl.cli fetch --url "http://loadbalancer-pro
 - GitHub Pages deployment workflow for the React client: `.github/workflows/static.yml`
 - Pages build expects the repository URL base path (`/dwarfBoard/`)
 
-
 ## Leaderboard ETL + UI
 - Leaderboard contract: `shared/contracts/leaderboard.schema.json`
 - Aggregate raw snapshots into player metrics:
