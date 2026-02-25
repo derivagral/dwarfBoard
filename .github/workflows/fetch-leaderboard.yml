@@ -1,0 +1,74 @@
+name: Fetch leaderboard snapshots
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - ".github/workflows/fetch-leaderboard.yml"
+      - "etl/src/dwarfboard_etl/**"
+      - "etl/pyproject.toml"
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Leaderboard endpoint URL override"
+        required: false
+        default: "http://loadbalancer-prod-1ac6c83-453346156.us-east-1.elb.amazonaws.com/leaderboards/scores/?"
+      output_dir:
+        description: "Where snapshots are written"
+        required: false
+        default: "etl/data/raw"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve fetch configuration
+        id: config
+        env:
+          SECRET_LEADERBOARD_URL: ${{ secrets.LEADERBOARD_URL }}
+        run: |
+          DEFAULT_URL="http://loadbalancer-prod-1ac6c83-453346156.us-east-1.elb.amazonaws.com/leaderboards/scores/?"
+          INPUT_URL="${{ github.event.inputs.url }}"
+          INPUT_OUTPUT_DIR="${{ github.event.inputs.output_dir }}"
+
+          URL="$INPUT_URL"
+          if [ -z "$URL" ]; then
+            URL="$SECRET_LEADERBOARD_URL"
+          fi
+          if [ -z "$URL" ]; then
+            URL="$DEFAULT_URL"
+          fi
+
+          OUTPUT_DIR="$INPUT_OUTPUT_DIR"
+          if [ -z "$OUTPUT_DIR" ]; then
+            OUTPUT_DIR="etl/data/raw"
+          fi
+
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "output_dir=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch snapshot
+        run: |
+          PYTHONPATH=etl/src python -m dwarfboard_etl.cli fetch \
+            --url "${{ steps.config.outputs.url }}" \
+            --output-dir "${{ steps.config.outputs.output_dir }}"
+
+      - name: Upload fetched artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: leaderboard-snapshots
+          path: ${{ steps.config.outputs.output_dir }}/
+          if-no-files-found: error
