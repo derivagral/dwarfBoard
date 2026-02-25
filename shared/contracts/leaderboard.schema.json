@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dwarfboard.local/contracts/leaderboard.schema.json",
+  "title": "Leaderboard Player Metric",
+  "type": "object",
+  "required": [
+    "account",
+    "character",
+    "class_name",
+    "stance",
+    "rupture_level",
+    "build_score",
+    "snapshots_seen",
+    "seen_minutes_estimate",
+    "seen_time_per_rupture"
+  ],
+  "properties": {
+    "account": { "type": "string", "minLength": 1 },
+    "character": { "type": "string", "minLength": 1 },
+    "class_name": { "type": "string", "minLength": 1 },
+    "stance": { "type": "string", "minLength": 1 },
+    "rupture_level": { "type": "integer", "minimum": 0 },
+    "build_score": { "type": "integer", "minimum": 0 },
+    "snapshots_seen": { "type": "integer", "minimum": 0 },
+    "seen_minutes_estimate": { "type": "integer", "minimum": 0 },
+    "seen_time_per_rupture": { "type": "number", "minimum": 0 },
+    "first_clear_zul": { "type": "boolean" },
+    "first_clear_archeon": { "type": "boolean" },
+    "first_clear_bridge": { "type": "boolean" },
+    "first_clear_skorch": { "type": "boolean" },
+    "first_clear_dark": { "type": "boolean" },
+    "cleared_r18": { "type": "boolean" },
+    "cleared_r30": { "type": "boolean" },
+    "cleared_r36": { "type": "boolean" },
+    "cleared_r75": { "type": "boolean" },
+    "cleared_r100": { "type": "boolean" },
+    "cleared_r125": { "type": "boolean" },
+    "cleared_r200": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

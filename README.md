@@ -5,7 +5,7 @@ Bootstrapped monorepo with a first-pass ETL pipeline, fetch automation, and shar
 ## Layout
 - `etl/`: Python ETL package + CLI + tests
 - `shared/contracts/`: JSON schema for analytics metrics
-- `client/`: deferred client app planning notes
+- `client/`: React leaderboard UI scaffold
 - `.github/workflows/`: scheduled and manual automation
 
 ## Quickstart (ETL aggregate)
@@ -21,5 +21,16 @@ PYTHONPATH=src python -m dwarfboard_etl.cli fetch --url "http://loadbalancer-pro
 ```
 
 ## Automation
-- Hourly leaderboard fetch workflow: `.github/workflows/fetch-leaderboard.yml`
-- Also runs on push to `main`/`master` when ETL fetch files change
+- 10-minute leaderboard fetch workflow: `.github/workflows/fetch-leaderboard.yml`
+- GitHub Pages deployment workflow for the React client: `.github/workflows/static.yml`
+- Pages build expects the repository URL base path (`/dwarfBoard/`)
+
+
+## Leaderboard ETL + UI
+- Leaderboard contract: `shared/contracts/leaderboard.schema.json`
+- Aggregate raw snapshots into player metrics:
+```bash
+cd etl
+PYTHONPATH=src python -m dwarfboard_etl.cli leaderboard-aggregate --snapshots-dir data/raw --output data/leaderboard_metrics.csv --interval-minutes 60
+```
+- `--interval-minutes` can be lowered to `10` once fetch cadence fully moves to 10-minute scans.

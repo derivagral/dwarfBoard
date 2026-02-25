@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from .fetch import fetch_snapshot
+from .leaderboard import run_leaderboard_pipeline
 from .pipeline import run_pipeline
 
 
@@ -17,6 +18,19 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_parser.add_argument("--output", required=True, help="Path for aggregated output CSV")
 
     fetch_parser = subparsers.add_parser("fetch", help="Fetch leaderboard snapshot")
+
+    leaderboard_parser = subparsers.add_parser(
+        "leaderboard-aggregate",
+        help="Aggregate raw leaderboard snapshots into player leaderboard metrics",
+    )
+    leaderboard_parser.add_argument("--snapshots-dir", required=True, help="Directory with raw snapshot JSON files")
+    leaderboard_parser.add_argument("--output", required=True, help="Path for aggregated leaderboard CSV")
+    leaderboard_parser.add_argument(
+        "--interval-minutes",
+        type=int,
+        default=60,
+        help="Scan interval used to estimate seen time (use 10 once fetch cadence is updated)",
+    )
     fetch_parser.add_argument("--url", required=True, help="Leaderboard endpoint URL")
     fetch_parser.add_argument(
         "--output-dir",
@@ -32,6 +46,11 @@ def main() -> None:
     if args.command == "aggregate":
         rows = run_pipeline(args.events, args.output)
         print(f"Wrote {len(rows)} rows to {args.output}")
+        return
+
+    if args.command == "leaderboard-aggregate":
+        rows = run_leaderboard_pipeline(args.snapshots_dir, args.output, interval_minutes=args.interval_minutes)
+        print(f"Wrote {len(rows)} leaderboard rows to {args.output}")
         return
 
     if args.command == "fetch":
