@@ -10,7 +10,7 @@ on:
       - "etl/src/dwarfboard_etl/**"
       - "etl/pyproject.toml"
   schedule:
-    - cron: "0 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
     inputs:
       url:

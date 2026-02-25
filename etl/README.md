@@ -32,7 +32,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 
 ## GitHub Actions fetch workflow
 The repo includes `.github/workflows/fetch-leaderboard.yml`.
-- Runs hourly (`0 * * * *`)
+- Runs every 10 minutes (`*/10 * * * *`)
 - Runs on merge/push to `main` and `master` when ETL/fetch workflow files change
 - Supports manual trigger (`workflow_dispatch`) with optional URL/output dir overrides
 - URL resolution order: workflow input `url` → repo secret `LEADERBOARD_URL` → default hardcoded load balancer URL
@@ -43,3 +43,16 @@ The repo includes `.github/workflows/fetch-leaderboard.yml`.
 2. Add job config (windowing/backfills)
 3. Load into warehouse tables instead of local CSV
 4. Add dbt or SQL model layer for client-facing metrics
+
+
+## Leaderboard aggregate (player-centric metrics)
+```bash
+cd etl
+PYTHONPATH=src python -m dwarfboard_etl.cli leaderboard-aggregate --snapshots-dir data/raw --output data/leaderboard_metrics.csv --interval-minutes 60
+```
+
+Output includes scaffolding for:
+- Seen-time estimates (`seen_minutes_estimate`)
+- Seen Time / Rupture (`seen_time_per_rupture`)
+- First-clear flags (`zul`, `archeon`, `bridge`, `skorch`, `dark`)
+- Rupture milestone flags (`r18`, `r30`, `r36`, `r75`, `r100`, `r125`, `r200`)

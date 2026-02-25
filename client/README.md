@@ -1,11 +1,20 @@
-# dwarfBoard client (placeholder)
+# dwarfBoard client
 
-Client app is intentionally deferred while ETL is stabilized.
+React + Vite scaffold for leaderboard display tied to ETL/shared contracts.
 
-## Planned scope
-- Dashboard for daily active users and event trends
-- Filters by date range and event type
-- Contract-bound charts from `shared/contracts/metric.schema.json`
+## Run locally
+```bash
+cd client
+npm install
+npm run dev
+```
 
-## Near-term
-After ETL output is pushed to a warehouse (or API), scaffold the client with those contracts and build read-only dashboards first.
+## Current UI scope
+- Leaderboard base table with `Build`, `Rupture`, `Seen Time / Rupture`, and `Clears` columns
+- Four broad category cards for Build, Rupture Progress, Seen Time, and First Clears
+- Hover tooltip scaffold on the clears badge for:
+  - First clears: Zul, Archeon, Bridge, Skorch, Dark
+  - Rupture checkpoints: r18, r30, r36, r75, r100, r125, r200
+
+## Data integration target
+The client is designed to consume rows matching `shared/contracts/leaderboard.schema.json` that come from the ETL leaderboard aggregate command.

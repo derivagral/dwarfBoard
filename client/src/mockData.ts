@@ -1,0 +1,48 @@
+import { LeaderboardPlayer } from './types';
+
+export const leaderboardPlayers: LeaderboardPlayer[] = [
+  {
+    account: 'Asharita',
+    character: 'Drake',
+    className: 'BS',
+    stance: 'Sword',
+    buildScore: 1160,
+    ruptureLevel: 434,
+    seenMinutesEstimate: 2520,
+    seenTimePerRupture: 5.81,
+    firstClears: { zul: true, bridge: true, dark: true },
+  },
+  {
+    account: 'Konmura',
+    character: 'KonmuraTTV',
+    className: 'Tox',
+    stance: 'Dual',
+    buildScore: 1068,
+    ruptureLevel: 409,
+    seenMinutesEstimate: 2080,
+    seenTimePerRupture: 5.09,
+    firstClears: { zul: true, archeon: true, skorch: true },
+  },
+  {
+    account: 'Nithryok',
+    character: 'Nith',
+    className: 'LP',
+    stance: 'Spear',
+    buildScore: 808,
+    ruptureLevel: 289,
+    seenMinutesEstimate: 1260,
+    seenTimePerRupture: 4.36,
+    firstClears: { bridge: true },
+  },
+  {
+    account: 'MabusBambus',
+    character: 'Zimt',
+    className: 'AA',
+    stance: 'Bow',
+    buildScore: 789,
+    ruptureLevel: 229,
+    seenMinutesEstimate: 990,
+    seenTimePerRupture: 4.32,
+    firstClears: { zul: true, dark: true },
+  },
+];
