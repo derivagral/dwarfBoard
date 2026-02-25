@@ -1,0 +1,5 @@
+user_id,timestamp,event_type
+u1,2026-01-01T08:00:00Z,view
+u2,2026-01-01T08:30:00Z,view
+u1,2026-01-01T09:00:00Z,signup
+u3,2026-01-02T11:00:00Z,view

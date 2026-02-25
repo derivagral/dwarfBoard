@@ -1,0 +1,4 @@
+event_date,event_type,event_count,unique_users
+2026-01-01,signup,1,1
+2026-01-01,view,2,2
+2026-01-02,view,1,1

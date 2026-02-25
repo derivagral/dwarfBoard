@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dwarfboard.local/contracts/metric.schema.json",
+  "title": "Daily Event Metric",
+  "type": "object",
+  "required": ["event_date", "event_type", "event_count", "unique_users"],
+  "properties": {
+    "event_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unique_users": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}
