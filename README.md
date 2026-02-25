@@ -21,9 +21,9 @@ PYTHONPATH=src python -m dwarfboard_etl.cli fetch --url "http://loadbalancer-pro
 ```
 
 ## Automation
-- Hourly leaderboard fetch workflow: `.github/workflows/fetch-leaderboard.yml`
-- Also runs on push to `main`/`master` when ETL fetch files change
-
+- 10-minute leaderboard fetch workflow: `.github/workflows/fetch-leaderboard.yml`
+- GitHub Pages deployment workflow for the React client: `.github/workflows/static.yml`
+- Pages build expects the repository URL base path (`/dwarfBoard/`)
 
 ## Leaderboard ETL + UI
 - Leaderboard contract: `shared/contracts/leaderboard.schema.json`

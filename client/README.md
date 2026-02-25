@@ -18,3 +18,7 @@ npm run dev
 
 ## Data integration target
 The client is designed to consume rows matching `shared/contracts/leaderboard.schema.json` that come from the ETL leaderboard aggregate command.
+
+## GitHub Pages
+- The Vite build is configured with `base=/dwarfBoard/` for production builds so assets resolve correctly on repository pages.
+- Deployment workflow: `.github/workflows/static.yml` (builds `client/` and publishes `client/dist`).
