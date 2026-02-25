@@ -11,6 +11,14 @@ from typing import Any
 TRACKED_BOSSES = ("zul", "archeon", "bridge", "skorch", "dark")
 RUPTURE_MILESTONES = (18, 30, 36, 75, 100, 125, 200)
 
+BOSS_DUNGEON_ALIASES: dict[str, tuple[str, ...]] = {
+    "zul": ("zul",),
+    "archeon": ("archeon",),
+    "bridge": ("bridge of demigods", "bridge"),
+    "skorch": ("skorch",),
+    "dark": ("dark drythus", "dark bridge", "dark olympus", "dark"),
+}
+
 
 @dataclass(slots=True)
 class LeaderboardRecord:
@@ -28,7 +36,7 @@ def _extract_entries(payload: Any) -> list[dict[str, Any]]:
         return [row for row in payload if isinstance(row, dict)]
 
     if isinstance(payload, dict):
-        for key in ("entries", "players", "leaderboard", "data", "scores"):
+        for key in ("entries", "players", "leaderboard", "leaderboards", "data", "scores"):
             candidate = payload.get(key)
             if isinstance(candidate, list):
                 return [row for row in candidate if isinstance(row, dict)]
@@ -53,6 +61,10 @@ def _as_str(value: Any, fallback: str = "") -> str:
 
 def _first_clear_flags(entry: dict[str, Any]) -> dict[str, bool]:
     normalized = {str(k).lower(): v for k, v in entry.items()}
+    dungeons_raw = normalized.get("dungeons")
+    dungeon_keys = set()
+    if isinstance(dungeons_raw, dict):
+        dungeon_keys = {str(k).strip().lower() for k, v in dungeons_raw.items() if _as_int(v) > 0}
     flags: dict[str, bool] = {}
 
     for boss in TRACKED_BOSSES:
@@ -60,8 +72,18 @@ def _first_clear_flags(entry: dict[str, Any]) -> dict[str, bool]:
         value = normalized.get(flag_name)
         if value is None:
             value = normalized.get(f"{boss}_first_clear")
+        if value is None and dungeon_keys:
+            value = any(alias in dungeon_keys for alias in BOSS_DUNGEON_ALIASES[boss])
         flags[flag_name] = bool(value)
     return flags
+
+
+def _split_name(value: Any) -> tuple[str, str]:
+    text = _as_str(value, "unknown")
+    if "(" in text and text.endswith(")"):
+        account, character = text.rsplit("(", 1)
+        return _as_str(account, "unknown").rstrip(), _as_str(character[:-1], "unknown")
+    return text, "unknown"
 
 
 def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 60) -> list[dict[str, Any]]:
@@ -78,8 +100,12 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
         payload = json.loads(path.read_text(encoding="utf-8"))
         entries = _extract_entries(payload)
         for entry in entries:
-            account = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "unknown")
-            character = _as_str(entry.get("character") or entry.get("character_name"), "unknown")
+            account = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "")
+            character = _as_str(entry.get("character") or entry.get("character_name"), "")
+            if not account and not character:
+                account, character = _split_name(entry.get("name"))
+            account = account or "unknown"
+            character = character or "unknown"
             key = (account, character)
 
             record = players.get(key)
@@ -88,8 +114,10 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                     account=account,
                     character=character,
                     class_name=_as_str(entry.get("class") or entry.get("class_name"), "unknown"),
-                    stance=_as_str(entry.get("stance"), "unknown"),
-                    rupture_level=_as_int(entry.get("rupture") or entry.get("rupture_level")),
+                    stance=_as_str(entry.get("stance") or (entry.get("build") or {}).get("stance"), "unknown"),
+                    rupture_level=_as_int(
+                        entry.get("rupture") or entry.get("rupture_level") or entry.get("raptureLevel")
+                    ),
                     build_score=_as_int(entry.get("score") or entry.get("build_score") or entry.get("level")),
                     snapshots_seen=0,
                 )
@@ -97,7 +125,10 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                 clear_flags[key] = _first_clear_flags(entry)
 
             record.snapshots_seen += 1
-            record.rupture_level = max(record.rupture_level, _as_int(entry.get("rupture") or entry.get("rupture_level")))
+            record.rupture_level = max(
+                record.rupture_level,
+                _as_int(entry.get("rupture") or entry.get("rupture_level") or entry.get("raptureLevel")),
+            )
             record.build_score = max(record.build_score, _as_int(entry.get("score") or entry.get("build_score") or entry.get("level")))
             entry_flags = _first_clear_flags(entry)
             for flag_name, value in entry_flags.items():
