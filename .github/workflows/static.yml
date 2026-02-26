@@ -35,35 +35,7 @@ jobs:
           python-version: '3.11'
 
       - name: Fetch + aggregate leaderboard payload variants
-        run: |
-          mkdir -p client/public etl/data
-          PYTHONPATH=etl/src python - <<'PY'
-          import json
-          from pathlib import Path
-          from urllib.parse import urlencode
-
-          from dwarfboard_etl.fetch import fetch_snapshot
-          from dwarfboard_etl.leaderboard import run_leaderboard_pipeline
-
-          base_url = 'http://loadbalancer-prod-1ac6c83-453346156.us-east-1.elb.amazonaws.com/leaderboards/scores/?'
-          variants = {
-              'solo': {'fellowship': 'false', 'hardcore': 'false'},
-              'fellowship': {'fellowship': 'true', 'hardcore': 'false'},
-              'hardcore_solo': {'fellowship': 'false', 'hardcore': 'true'},
-              'hardcore_fellowship': {'fellowship': 'true', 'hardcore': 'true'},
-          }
-
-          payload = {'variants': {}}
-          for key, query in variants.items():
-              url = f"{base_url}{urlencode(query)}"
-              out_dir = Path('etl/data/raw') / key
-              fetch_snapshot(url, out_dir)
-              rows = run_leaderboard_pipeline(out_dir, Path('etl/data') / f'leaderboard_{key}.csv', interval_minutes=10)
-              payload['variants'][key] = rows
-
-          Path('client/public/leaderboard.json').write_text(json.dumps(payload, indent=2), encoding='utf-8')
-          print('Wrote leaderboard payload variants to client/public/leaderboard.json')
-          PY
+        run: PYTHONPATH=etl/src python etl/scripts/generate_pages_payload.py
 
       - name: Setup Node
         uses: actions/setup-node@v4
