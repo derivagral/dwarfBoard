@@ -4,12 +4,24 @@ from __future__ import annotations
 
 import csv
 import json
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 TRACKED_BOSSES = ("zul", "archeon", "bridge", "skorch", "dark")
 RUPTURE_MILESTONES = (18, 30, 36, 75, 100, 125, 200)
+
+BOSS_DUNGEON_ALIASES: dict[str, tuple[str, ...]] = {
+    "zul": ("zul",),
+    "archeon": ("archeon",),
+    "bridge": ("bridge of demigods", "bridge"),
+    "skorch": ("skorch",),
+    # Dark dungeons are a separate harder variant and should count as dark clears.
+    "dark": ("dark drythus", "dark bridge", "dark olympus", "dark"),
+}
+
+SKILL_MOD_SLOTS = ("goblet", "weapon", "horn", "belt", "trinket")
 
 
 @dataclass(slots=True)
@@ -21,6 +33,8 @@ class LeaderboardRecord:
     rupture_level: int
     build_score: int
     snapshots_seen: int
+    dominant_skill: str
+    dominant_skill_count: int
 
 
 def _extract_entries(payload: Any) -> list[dict[str, Any]]:
@@ -28,7 +42,7 @@ def _extract_entries(payload: Any) -> list[dict[str, Any]]:
         return [row for row in payload if isinstance(row, dict)]
 
     if isinstance(payload, dict):
-        for key in ("entries", "players", "leaderboard", "data", "scores"):
+        for key in ("entries", "players", "leaderboard", "leaderboards", "data", "scores"):
             candidate = payload.get(key)
             if isinstance(candidate, list):
                 return [row for row in candidate if isinstance(row, dict)]
@@ -53,6 +67,10 @@ def _as_str(value: Any, fallback: str = "") -> str:
 
 def _first_clear_flags(entry: dict[str, Any]) -> dict[str, bool]:
     normalized = {str(k).lower(): v for k, v in entry.items()}
+    dungeons_raw = normalized.get("dungeons")
+    dungeon_keys = set()
+    if isinstance(dungeons_raw, dict):
+        dungeon_keys = {str(k).strip().lower() for k, v in dungeons_raw.items() if _as_int(v) > 0}
     flags: dict[str, bool] = {}
 
     for boss in TRACKED_BOSSES:
@@ -60,27 +78,73 @@ def _first_clear_flags(entry: dict[str, Any]) -> dict[str, bool]:
         value = normalized.get(flag_name)
         if value is None:
             value = normalized.get(f"{boss}_first_clear")
+        if value is None and dungeon_keys:
+            value = any(alias in dungeon_keys for alias in BOSS_DUNGEON_ALIASES[boss])
         flags[flag_name] = bool(value)
     return flags
 
 
-def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 60) -> list[dict[str, Any]]:
-    """Aggregate leaderboard snapshots into player-centric rows.
+def _split_name(value: Any) -> tuple[str, str]:
+    text = _as_str(value, "unknown")
+    if "(" in text and text.endswith(")"):
+        account, character = text.rsplit("(", 1)
+        return _as_str(account, "unknown").rstrip(), _as_str(character[:-1], "unknown")
+    return text, "unknown"
 
-    interval_minutes controls the seen-time estimate and allows easy migration
-    from current hourly scans to future 10-minute scans without changing downstream consumers.
-    """
+
+def _skill_from_modifier(value: str) -> str:
+    if ":" not in value:
+        return ""
+    return value.split(":", 1)[0].strip()
+
+
+def _extract_build_profile(entry: dict[str, Any]) -> tuple[str, int, dict[str, str]]:
+    build_raw = entry.get("build")
+    equipment_mods: dict[str, Any] = {}
+    if isinstance(build_raw, dict):
+        mods_raw = build_raw.get("equipmentMods")
+        if isinstance(mods_raw, dict):
+            equipment_mods = mods_raw
+
+    slot_values: dict[str, str] = {
+        slot: _as_str(equipment_mods.get(slot), "")
+        for slot in SKILL_MOD_SLOTS
+    }
+    skill_counter: Counter[str] = Counter(
+        skill for skill in (_skill_from_modifier(text) for text in slot_values.values()) if skill
+    )
+
+    if not skill_counter:
+        return "unknown", 0, slot_values
+
+    highest = skill_counter.most_common()
+    top_count = highest[0][1]
+    top_skills = sorted(skill for skill, count in highest if count == top_count)
+    if len(top_skills) > 1:
+        return "2+", top_count, slot_values
+    return top_skills[0], top_count, slot_values
+
+
+def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 60) -> list[dict[str, Any]]:
+    """Aggregate leaderboard snapshots into player-centric rows."""
 
     players: dict[tuple[str, str], LeaderboardRecord] = {}
     clear_flags: dict[tuple[str, str], dict[str, bool]] = {}
+    build_profiles: dict[tuple[str, str], dict[str, str]] = {}
 
     for path in sorted(snapshot_paths):
         payload = json.loads(path.read_text(encoding="utf-8"))
         entries = _extract_entries(payload)
         for entry in entries:
-            account = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "unknown")
-            character = _as_str(entry.get("character") or entry.get("character_name"), "unknown")
+            account = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "")
+            character = _as_str(entry.get("character") or entry.get("character_name"), "")
+            if not account and not character:
+                account, character = _split_name(entry.get("name"))
+            account = account or "unknown"
+            character = character or "unknown"
             key = (account, character)
+
+            dominant_skill, dominant_skill_count, slot_values = _extract_build_profile(entry)
 
             record = players.get(key)
             if record is None:
@@ -88,17 +152,35 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                     account=account,
                     character=character,
                     class_name=_as_str(entry.get("class") or entry.get("class_name"), "unknown"),
-                    stance=_as_str(entry.get("stance"), "unknown"),
-                    rupture_level=_as_int(entry.get("rupture") or entry.get("rupture_level")),
+                    stance=_as_str(entry.get("stance") or (entry.get("build") or {}).get("stance"), "unknown"),
+                    rupture_level=_as_int(
+                        entry.get("rupture") or entry.get("rupture_level") or entry.get("raptureLevel")
+                    ),
                     build_score=_as_int(entry.get("score") or entry.get("build_score") or entry.get("level")),
                     snapshots_seen=0,
+                    dominant_skill=dominant_skill,
+                    dominant_skill_count=dominant_skill_count,
                 )
                 players[key] = record
                 clear_flags[key] = _first_clear_flags(entry)
+                build_profiles[key] = slot_values
 
             record.snapshots_seen += 1
-            record.rupture_level = max(record.rupture_level, _as_int(entry.get("rupture") or entry.get("rupture_level")))
+            record.rupture_level = max(
+                record.rupture_level,
+                _as_int(entry.get("rupture") or entry.get("rupture_level") or entry.get("raptureLevel")),
+            )
             record.build_score = max(record.build_score, _as_int(entry.get("score") or entry.get("build_score") or entry.get("level")))
+            if record.class_name == "unknown":
+                record.class_name = _as_str(entry.get("class") or entry.get("class_name"), "unknown")
+            if record.stance == "unknown":
+                record.stance = _as_str(entry.get("stance") or (entry.get("build") or {}).get("stance"), "unknown")
+
+            if dominant_skill_count > record.dominant_skill_count:
+                record.dominant_skill = dominant_skill
+                record.dominant_skill_count = dominant_skill_count
+                build_profiles[key] = slot_values
+
             entry_flags = _first_clear_flags(entry)
             for flag_name, value in entry_flags.items():
                 clear_flags[key][flag_name] = clear_flags[key][flag_name] or value
@@ -122,6 +204,9 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                 "snapshots_seen": record.snapshots_seen,
                 "seen_minutes_estimate": seen_minutes,
                 "seen_time_per_rupture": seen_time_per_rupture,
+                "skill_name": record.dominant_skill,
+                "skill_modifier_count": record.dominant_skill_count,
+                "skill_mods": build_profiles.get(key, {}),
                 **clear_flags[key],
                 **milestone_flags,
             }
@@ -152,6 +237,9 @@ def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, 
         "snapshots_seen",
         "seen_minutes_estimate",
         "seen_time_per_rupture",
+        "skill_name",
+        "skill_modifier_count",
+        "skill_mods",
         *[f"first_clear_{boss}" for boss in TRACKED_BOSSES],
         *[f"cleared_r{milestone}" for milestone in RUPTURE_MILESTONES],
     ]

@@ -11,7 +11,7 @@ body {
 
 .page {
   padding: 24px;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -19,28 +19,30 @@ body {
   color: #b9c3eb;
 }
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin: 16px 0 24px;
+.variantTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
 }
 
-.card {
-  border: 1px solid #2c355f;
-  border-radius: 12px;
-  padding: 12px;
+.variantTab {
+  border: 1px solid #2f3b66;
   background: #1a2140;
+  color: #cfe0ff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
 }
 
-.card h2 {
-  margin: 0 0 8px;
-  font-size: 1rem;
+.variantTab.active {
+  border-color: #6f8fff;
+  background: #263362;
 }
 
-.card p {
-  margin: 0;
-  color: #b9c3eb;
+.variantTab:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .leaderboard {
@@ -56,6 +58,7 @@ body {
   padding: 10px;
   border-bottom: 1px solid #2d3662;
   text-align: left;
+  vertical-align: top;
 }
 
 .leaderboard th {
@@ -68,17 +71,41 @@ body {
 }
 
 .badge {
-  display: inline-block;
   border: 1px solid #5472d3;
   color: #cfe0ff;
   border-radius: 999px;
   font-size: 0.8rem;
   padding: 4px 10px;
-  cursor: help;
+  background: transparent;
+  cursor: pointer;
+}
+
+.inlineTooltip {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #37477e;
+  border-radius: 10px;
+  background: #131b36;
+  max-width: 420px;
+}
+
+.inlineTooltip ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
+.inlineTooltip li {
+  margin: 2px 0;
+  color: #b9c3eb;
+}
+
+.inlineTooltip span {
+  color: #d9e5ff;
+  text-transform: capitalize;
 }
 
 @media (max-width: 900px) {
-  .cards {
-    grid-template-columns: repeat(2, 1fr);
+  .page {
+    padding: 16px;
   }
 }
