@@ -8,6 +8,49 @@ from dwarfboard_etl.leaderboard import build_leaderboard_rows, run_leaderboard_p
 
 
 class LeaderboardPipelineTests(unittest.TestCase):
+    def test_build_leaderboard_rows_supports_live_payload_shape(self) -> None:
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "s1.json").write_text(
+                json.dumps(
+                    {
+                        "seasonId": "s1",
+                        "leaderboards": [
+                            {
+                                "name": "Asharita (Drake)",
+                                "build": {
+                                    "stance": "Sword",
+                                    "equipmentMods": {
+                                        "goblet": "Burning Shield: bonus",
+                                        "weapon": "Burning Shield: bonus",
+                                        "horn": "Burning Shield: bonus",
+                                    },
+                                },
+                                "level": "1160",
+                                "raptureLevel": "434",
+                                "dungeons": {"Zul": 12, "Bridge of Demigods": 1, "Dark Drythus": 2},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["account"], "Asharita")
+        self.assertEqual(row["character"], "Drake")
+        self.assertEqual(row["rupture_level"], 434)
+        self.assertEqual(row["build_score"], 1160)
+        self.assertEqual(row["stance"], "Sword")
+        self.assertEqual(row["skill_name"], "Burning Shield")
+        self.assertEqual(row["skill_modifier_count"], 3)
+        self.assertTrue(row["first_clear_zul"])
+        self.assertTrue(row["first_clear_bridge"])
+        self.assertTrue(row["first_clear_dark"])
+
     def test_build_leaderboard_rows_estimates_seen_time_and_flags(self) -> None:
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -23,6 +66,14 @@ class LeaderboardPipelineTests(unittest.TestCase):
                                 "rupture": 36,
                                 "score": 1160,
                                 "first_clear_zul": True,
+                                "build": {
+                                    "equipmentMods": {
+                                        "goblet": "Skill A: modifier",
+                                        "weapon": "Skill A: modifier",
+                                        "horn": "Skill B: modifier",
+                                        "belt": "Skill B: modifier",
+                                    }
+                                },
                             }
                         ]
                     }
@@ -55,6 +106,8 @@ class LeaderboardPipelineTests(unittest.TestCase):
         self.assertEqual(row["seen_minutes_estimate"], 20)
         self.assertEqual(row["snapshots_seen"], 2)
         self.assertAlmostEqual(row["seen_time_per_rupture"], 0.27)
+        self.assertEqual(row["skill_name"], "2+")
+        self.assertEqual(row["skill_modifier_count"], 2)
         self.assertTrue(row["first_clear_zul"])
         self.assertTrue(row["first_clear_bridge"])
         self.assertTrue(row["cleared_r75"])
@@ -84,6 +137,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
             self.assertEqual(len(csv_rows), 1)
             self.assertEqual(csv_rows[0]["account"], "A")
             self.assertEqual(csv_rows[0]["seen_minutes_estimate"], "60")
+            self.assertIn("skill_name", csv_rows[0])
 
 
 if __name__ == "__main__":
