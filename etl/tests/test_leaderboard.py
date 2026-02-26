@@ -8,6 +8,40 @@ from dwarfboard_etl.leaderboard import build_leaderboard_rows, run_leaderboard_p
 
 
 class LeaderboardPipelineTests(unittest.TestCase):
+    def test_build_leaderboard_rows_supports_live_payload_shape(self) -> None:
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "s1.json").write_text(
+                json.dumps(
+                    {
+                        "seasonId": "s1",
+                        "leaderboards": [
+                            {
+                                "name": "Asharita (Drake)",
+                                "build": {"stance": "Sword"},
+                                "level": "1160",
+                                "raptureLevel": "434",
+                                "dungeons": {"Zul": 12, "Bridge of Demigods": 1, "Dark Drythus": 2},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["account"], "Asharita")
+        self.assertEqual(row["character"], "Drake")
+        self.assertEqual(row["rupture_level"], 434)
+        self.assertEqual(row["build_score"], 1160)
+        self.assertEqual(row["stance"], "Sword")
+        self.assertTrue(row["first_clear_zul"])
+        self.assertTrue(row["first_clear_bridge"])
+        self.assertTrue(row["first_clear_dark"])
+
     def test_build_leaderboard_rows_estimates_seen_time_and_flags(self) -> None:
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
