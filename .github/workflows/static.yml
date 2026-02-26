@@ -38,13 +38,13 @@ jobs:
           PYTHONPATH=etl/src python -m dwarfboard_etl.cli fetch --url "http://loadbalancer-prod-1ac6c83-453346156.us-east-1.elb.amazonaws.com/leaderboards/scores/?" --output-dir etl/data/raw
           PYTHONPATH=etl/src python -m dwarfboard_etl.cli leaderboard-aggregate --snapshots-dir etl/data/raw --output etl/data/leaderboard_metrics.csv --interval-minutes 10
           PYTHONPATH=etl/src python - <<'PY2'
-import json
-from pathlib import Path
-from dwarfboard_etl.leaderboard import run_leaderboard_pipeline
-rows = run_leaderboard_pipeline('etl/data/raw', 'etl/data/leaderboard_metrics.csv', interval_minutes=10)
-Path('client/public/leaderboard.json').write_text(json.dumps(rows, indent=2), encoding='utf-8')
-print(f'Wrote {len(rows)} rows to client/public/leaderboard.json')
-PY2
+          import json
+          from pathlib import Path
+          from dwarfboard_etl.leaderboard import run_leaderboard_pipeline
+          rows = run_leaderboard_pipeline('etl/data/raw', 'etl/data/leaderboard_metrics.csv', interval_minutes=10)
+          Path('client/public/leaderboard.json').write_text(json.dumps(rows, indent=2), encoding='utf-8')
+          print(f'Wrote {len(rows)} rows to client/public/leaderboard.json')
+          PY2
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
