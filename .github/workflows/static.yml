@@ -29,12 +29,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download pre-fetched snapshots
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: leaderboard-snapshots
+          path: etl/data/raw
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Fetch + aggregate leaderboard payload variants
+      - name: Generate leaderboard payload
         run: PYTHONPATH=etl/src python etl/scripts/generate_pages_payload.py
 
       - name: Setup Node
