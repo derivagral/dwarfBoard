@@ -15,27 +15,106 @@
     "seen_time_per_rupture"
   ],
   "properties": {
-    "account": { "type": "string", "minLength": 1 },
-    "character": { "type": "string", "minLength": 1 },
-    "class_name": { "type": "string", "minLength": 1 },
-    "stance": { "type": "string", "minLength": 1 },
-    "rupture_level": { "type": "integer", "minimum": 0 },
-    "build_score": { "type": "integer", "minimum": 0 },
-    "snapshots_seen": { "type": "integer", "minimum": 0 },
-    "seen_minutes_estimate": { "type": "integer", "minimum": 0 },
-    "seen_time_per_rupture": { "type": "number", "minimum": 0 },
-    "first_clear_zul": { "type": "boolean" },
-    "first_clear_archeon": { "type": "boolean" },
-    "first_clear_bridge": { "type": "boolean" },
-    "first_clear_skorch": { "type": "boolean" },
-    "first_clear_dark": { "type": "boolean" },
-    "cleared_r18": { "type": "boolean" },
-    "cleared_r30": { "type": "boolean" },
-    "cleared_r36": { "type": "boolean" },
-    "cleared_r75": { "type": "boolean" },
-    "cleared_r100": { "type": "boolean" },
-    "cleared_r125": { "type": "boolean" },
-    "cleared_r200": { "type": "boolean" }
+    "account": {
+      "type": "string",
+      "minLength": 1
+    },
+    "character": {
+      "type": "string",
+      "minLength": 1
+    },
+    "class_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stance": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rupture_level": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "build_score": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "snapshots_seen": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "seen_minutes_estimate": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "seen_time_per_rupture": {
+      "type": "number",
+      "minimum": 0
+    },
+    "first_clear_zul": {
+      "type": "boolean"
+    },
+    "first_clear_archeon": {
+      "type": "boolean"
+    },
+    "first_clear_bridge": {
+      "type": "boolean"
+    },
+    "first_clear_skorch": {
+      "type": "boolean"
+    },
+    "first_clear_dark": {
+      "type": "boolean"
+    },
+    "cleared_r18": {
+      "type": "boolean"
+    },
+    "cleared_r30": {
+      "type": "boolean"
+    },
+    "cleared_r36": {
+      "type": "boolean"
+    },
+    "cleared_r75": {
+      "type": "boolean"
+    },
+    "cleared_r100": {
+      "type": "boolean"
+    },
+    "cleared_r125": {
+      "type": "boolean"
+    },
+    "cleared_r200": {
+      "type": "boolean"
+    },
+    "skill_name": {
+      "type": "string"
+    },
+    "skill_modifier_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "skill_mods": {
+      "type": "object",
+      "properties": {
+        "goblet": {
+          "type": "string"
+        },
+        "weapon": {
+          "type": "string"
+        },
+        "horn": {
+          "type": "string"
+        },
+        "belt": {
+          "type": "string"
+        },
+        "trinket": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }

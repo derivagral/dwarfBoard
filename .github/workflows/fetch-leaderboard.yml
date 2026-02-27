@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: "Leaderboard endpoint URL override"
+        description: "Leaderboard endpoint base URL override"
         required: false
         default: "http://loadbalancer-prod-1ac6c83-453346156.us-east-1.elb.amazonaws.com/leaderboards/scores/?"
       output_dir:
@@ -60,11 +60,23 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "output_dir=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch snapshot
+      - name: Fetch all variant snapshots
         run: |
-          PYTHONPATH=etl/src python -m dwarfboard_etl.cli fetch \
-            --url "${{ steps.config.outputs.url }}" \
-            --output-dir "${{ steps.config.outputs.output_dir }}"
+          BASE_URL="${{ steps.config.outputs.url }}"
+          OUTPUT_DIR="${{ steps.config.outputs.output_dir }}"
+
+          declare -A VARIANTS
+          VARIANTS[solo]="fellowship=false&hardcore=false"
+          VARIANTS[fellowship]="fellowship=true&hardcore=false"
+          VARIANTS[hardcore_solo]="fellowship=false&hardcore=true"
+          VARIANTS[hardcore_fellowship]="fellowship=true&hardcore=true"
+
+          for variant in solo fellowship hardcore_solo hardcore_fellowship; do
+            echo "--- Fetching $variant ---"
+            PYTHONPATH=etl/src python -m dwarfboard_etl.cli fetch \
+              --url "${BASE_URL}${VARIANTS[$variant]}" \
+              --output-dir "${OUTPUT_DIR}/${variant}"
+          done
 
       - name: Upload fetched artifacts
         uses: actions/upload-artifact@v4
