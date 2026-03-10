@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from dwarfboard_etl.leaderboard import build_leaderboard_rows, run_leaderboard_pipeline
+from dwarfboard_etl.leaderboard import build_leaderboard_rows, reconcile_variant_transitions, run_leaderboard_pipeline
 
 
 class LeaderboardPipelineTests(unittest.TestCase):
@@ -29,6 +29,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                                 "level": "1160",
                                 "raptureLevel": "434",
                                 "dungeons": {"Zul": 12, "Bridge of Demigods": 1, "Dark Drythus": 2},
+                                "zone": "Dark Drythus",
                             }
                         ],
                     }
@@ -49,7 +50,10 @@ class LeaderboardPipelineTests(unittest.TestCase):
         self.assertEqual(row["skill_modifier_count"], 3)
         self.assertTrue(row["first_clear_zul"])
         self.assertTrue(row["first_clear_bridge"])
-        self.assertTrue(row["first_clear_dark"])
+        self.assertTrue(row["first_clear_dark_drythus"])
+        self.assertFalse(row["first_clear_dark_bridge"])
+        self.assertFalse(row["first_clear_dark_olympus"])
+        self.assertEqual(row["zone"], "Dark Drythus")
 
     def test_build_leaderboard_rows_estimates_seen_time_and_flags(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -138,6 +142,36 @@ class LeaderboardPipelineTests(unittest.TestCase):
             self.assertEqual(csv_rows[0]["account"], "A")
             self.assertEqual(csv_rows[0]["seen_minutes_estimate"], "60")
             self.assertIn("skill_name", csv_rows[0])
+
+
+    def test_reconcile_variant_transitions_moves_solo_to_fellowship(self) -> None:
+        solo_rows = [
+            {"account": "A", "character": "C", "rupture_level": 50},
+            {"account": "B", "character": "D", "rupture_level": 30},
+        ]
+        fellowship_rows = [
+            {"account": "A", "character": "C", "rupture_level": 75},
+        ]
+        variant_rows = {
+            "solo": solo_rows,
+            "fellowship": fellowship_rows,
+            "hardcore_solo": [],
+            "hardcore_fellowship": [],
+        }
+
+        result = reconcile_variant_transitions(variant_rows)
+
+        # Player A/C should be removed from solo (promoted to fellowship)
+        solo_accounts = [(r["account"], r["character"]) for r in result["solo"]]
+        self.assertNotIn(("A", "C"), solo_accounts)
+        self.assertIn(("B", "D"), solo_accounts)
+
+        # Fellowship should keep A/C with variant_history showing both
+        self.assertEqual(len(result["fellowship"]), 1)
+        self.assertEqual(result["fellowship"][0]["variant_history"], ["fellowship", "solo"])
+
+        # Solo-only player B/D should have solo-only history
+        self.assertEqual(result["solo"][0]["variant_history"], ["solo"])
 
 
 if __name__ == "__main__":

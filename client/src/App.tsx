@@ -6,7 +6,16 @@ import { isPayloadWithVariants, normalizeRows } from './normalize';
 import { BossKey, LeaderboardPlayer, LeaderboardVariantKey, Milestone } from './types';
 
 const milestones: Milestone[] = [18, 30, 36, 75, 100, 125, 200];
-const bosses: BossKey[] = ['zul', 'archeon', 'bridge', 'skorch', 'dark'];
+const bosses: BossKey[] = ['zul', 'archeon', 'bridge', 'skorch', 'darkDrythus', 'darkBridge', 'darkOlympus'];
+const bossDisplayNames: Record<BossKey, string> = {
+  zul: 'Zul',
+  archeon: 'Archeon',
+  bridge: 'Bridge',
+  skorch: 'Skorch',
+  darkDrythus: 'Dark Drythus',
+  darkBridge: 'Dark Bridge',
+  darkOlympus: 'Dark Olympus',
+};
 const variants: Array<{ key: LeaderboardVariantKey; label: string }> = [
   { key: 'solo', label: 'Solo' },
   { key: 'fellowship', label: 'Fellowship' },
@@ -20,7 +29,7 @@ function hasCleared(playerRupture: number, milestone: Milestone): boolean {
 
 function buildTooltipText(player: LeaderboardPlayer): string {
   const lines = ['Boss first clears:'];
-  for (const boss of bosses) lines.push(`- ${boss}: ${player.firstClears[boss] ? 'yes' : 'no'}`);
+  for (const boss of bosses) lines.push(`- ${bossDisplayNames[boss]}: ${player.firstClears[boss] ? 'yes' : 'no'}`);
   lines.push('', 'Rupture milestones:');
   for (const m of milestones) lines.push(`- r${m}: ${hasCleared(player.ruptureLevel, m) ? 'cleared' : 'pending'}`);
   return lines.join('\n');
@@ -123,7 +132,8 @@ export default function App() {
               <th>#</th>
               <th>Account</th>
               <th>Character</th>
-              <th>Class</th>
+              <th>Stance</th>
+              <th>Zone</th>
               <th>Build</th>
               <th>Rupture</th>
               <th>Seen Time / Rupture</th>
@@ -137,9 +147,17 @@ export default function App() {
               return (
                 <tr key={rowKey}>
                   <td>{idx + 1}</td>
-                  <td>{player.account}</td>
+                  <td>
+                    {player.account}
+                    {player.variantHistory && player.variantHistory.length > 1 && (
+                      <span className="badge subtle" title={`Also seen in: ${player.variantHistory.filter((v) => v !== variant).join(', ')}`}>
+                        {' '}ex-{player.variantHistory.find((v) => v !== variant)}
+                      </span>
+                    )}
+                  </td>
                   <td>{player.character}</td>
-                  <td>{player.className}</td>
+                  <td>{player.stance}</td>
+                  <td>{player.zone || '-'}</td>
                   <td>
                     <button
                       className="badge"
@@ -182,7 +200,7 @@ export default function App() {
                         <ul>
                           {bosses.map((boss) => (
                             <li key={boss}>
-                              <span>{boss}:</span> {player.firstClears[boss] ? 'yes' : 'no'}
+                              <span>{bossDisplayNames[boss]}:</span> {player.firstClears[boss] ? 'yes' : 'no'}
                             </li>
                           ))}
                         </ul>

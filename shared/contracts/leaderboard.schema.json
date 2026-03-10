@@ -63,7 +63,13 @@
     "first_clear_skorch": {
       "type": "boolean"
     },
-    "first_clear_dark": {
+    "first_clear_dark_drythus": {
+      "type": "boolean"
+    },
+    "first_clear_dark_bridge": {
+      "type": "boolean"
+    },
+    "first_clear_dark_olympus": {
       "type": "boolean"
     },
     "cleared_r18": {
@@ -86,6 +92,18 @@
     },
     "cleared_r200": {
       "type": "boolean"
+    },
+    "zone": {
+      "type": "string"
+    },
+    "last_seen_at": {
+      "type": "string"
+    },
+    "variant_history": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "skill_name": {
       "type": "string"

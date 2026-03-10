@@ -10,7 +10,8 @@ export const leaderboardPlayers: LeaderboardPlayer[] = [
     ruptureLevel: 434,
     seenMinutesEstimate: 2520,
     seenTimePerRupture: 5.81,
-    firstClears: { zul: true, bridge: true, dark: true },
+    firstClears: { zul: true, bridge: true, darkDrythus: true },
+    zone: 'Dark Drythus',
   },
   {
     account: 'Konmura',
@@ -22,6 +23,7 @@ export const leaderboardPlayers: LeaderboardPlayer[] = [
     seenMinutesEstimate: 2080,
     seenTimePerRupture: 5.09,
     firstClears: { zul: true, archeon: true, skorch: true },
+    zone: 'Archeon',
   },
   {
     account: 'Nithryok',
@@ -33,6 +35,7 @@ export const leaderboardPlayers: LeaderboardPlayer[] = [
     seenMinutesEstimate: 1260,
     seenTimePerRupture: 4.36,
     firstClears: { bridge: true },
+    zone: 'Bridge of Demigods',
   },
   {
     account: 'MabusBambus',
@@ -43,6 +46,7 @@ export const leaderboardPlayers: LeaderboardPlayer[] = [
     ruptureLevel: 229,
     seenMinutesEstimate: 990,
     seenTimePerRupture: 4.32,
-    firstClears: { zul: true, dark: true },
+    firstClears: { zul: true, darkOlympus: true },
+    zone: 'Zul',
   },
 ];

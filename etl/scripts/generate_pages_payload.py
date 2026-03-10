@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from dwarfboard_etl.fetch import fetch_snapshot
-from dwarfboard_etl.leaderboard import run_leaderboard_pipeline
+from dwarfboard_etl.leaderboard import reconcile_variant_transitions, run_leaderboard_pipeline
 
 BASE_URL = "http://loadbalancer-prod-1ac6c83-453346156.us-east-1.elb.amazonaws.com/leaderboards/scores/?"
 VARIANTS: dict[str, dict[str, str]] = {
@@ -70,6 +70,8 @@ def main() -> None:
             print(f"  [{key}] FAILED: {exc}", file=sys.stderr)
             errors.append(key)
             payload["variants"][key] = []
+
+    reconcile_variant_transitions(payload["variants"])
 
     out_path = Path("client/public/leaderboard.json")
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

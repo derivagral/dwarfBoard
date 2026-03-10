@@ -19,8 +19,15 @@ type LeaderboardJsonRow = {
   first_clear_archeon?: unknown;
   first_clear_bridge?: unknown;
   first_clear_skorch?: unknown;
-  first_clear_dark?: unknown;
+  first_clear_dark_drythus?: unknown;
+  first_clear_dark_bridge?: unknown;
+  first_clear_dark_olympus?: unknown;
   firstClears?: Partial<Record<BossKey, boolean>>;
+  zone?: unknown;
+  last_seen_at?: unknown;
+  lastSeenAt?: unknown;
+  variant_history?: unknown;
+  variantHistory?: unknown;
   skill_name?: unknown;
   skillName?: unknown;
   skill_modifier_count?: unknown;
@@ -64,6 +71,11 @@ function normalizeSkillMods(value: unknown): SkillMods {
   };
 }
 
+function normalizeVariantHistory(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string');
+}
+
 export function normalizeRows(rows: unknown[]): LeaderboardPlayer[] {
   return rows
     .map((row): LeaderboardPlayer | null => {
@@ -83,8 +95,13 @@ export function normalizeRows(rows: unknown[]): LeaderboardPlayer[] {
           archeon: asBoolean(data.firstClears?.archeon ?? data.first_clear_archeon),
           bridge: asBoolean(data.firstClears?.bridge ?? data.first_clear_bridge),
           skorch: asBoolean(data.firstClears?.skorch ?? data.first_clear_skorch),
-          dark: asBoolean(data.firstClears?.dark ?? data.first_clear_dark),
+          darkDrythus: asBoolean(data.firstClears?.darkDrythus ?? data.first_clear_dark_drythus),
+          darkBridge: asBoolean(data.firstClears?.darkBridge ?? data.first_clear_dark_bridge),
+          darkOlympus: asBoolean(data.firstClears?.darkOlympus ?? data.first_clear_dark_olympus),
         },
+        zone: asString(data.zone, ''),
+        lastSeenAt: asString(data.lastSeenAt ?? data.last_seen_at, ''),
+        variantHistory: normalizeVariantHistory(data.variantHistory ?? data.variant_history),
         skillName: asString(data.skillName ?? data.skill_name, ''),
         skillModifierCount: asNumber(data.skillModifierCount ?? data.skill_modifier_count),
         skillMods: normalizeSkillMods(data.skillMods ?? data.skill_mods),
