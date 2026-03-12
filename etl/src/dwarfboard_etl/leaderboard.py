@@ -4,22 +4,13 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-TRACKED_BOSSES = ("zul", "archeon", "bridge", "skorch", "dark")
 RUPTURE_MILESTONES = (18, 30, 36, 75, 100, 125, 200)
-
-BOSS_DUNGEON_ALIASES: dict[str, tuple[str, ...]] = {
-    "zul": ("zul",),
-    "archeon": ("archeon",),
-    "bridge": ("bridge of demigods", "bridge"),
-    "skorch": ("skorch",),
-    # Dark dungeons are a separate harder variant and should count as dark clears.
-    "dark": ("dark drythus", "dark bridge", "dark olympus", "dark"),
-}
 
 SKILL_MOD_SLOTS = ("goblet", "weapon", "horn", "belt", "trinket")
 
@@ -35,6 +26,10 @@ class LeaderboardRecord:
     snapshots_seen: int
     dominant_skill: str
     dominant_skill_count: int
+    zone: str
+    last_seen_at: str
+    dungeons: dict[str, int]
+    dungeon_first_seen: dict[str, str]
 
 
 def _extract_entries(payload: Any) -> list[dict[str, Any]]:
@@ -65,23 +60,32 @@ def _as_str(value: Any, fallback: str = "") -> str:
     return text or fallback
 
 
-def _first_clear_flags(entry: dict[str, Any]) -> dict[str, bool]:
-    normalized = {str(k).lower(): v for k, v in entry.items()}
-    dungeons_raw = normalized.get("dungeons")
-    dungeon_keys = set()
-    if isinstance(dungeons_raw, dict):
-        dungeon_keys = {str(k).strip().lower() for k, v in dungeons_raw.items() if _as_int(v) > 0}
-    flags: dict[str, bool] = {}
+def _extract_dungeons(entry: dict[str, Any]) -> dict[str, int]:
+    """Extract dungeon name → clear count from an entry.
 
-    for boss in TRACKED_BOSSES:
-        flag_name = f"first_clear_{boss}"
-        value = normalized.get(flag_name)
-        if value is None:
-            value = normalized.get(f"{boss}_first_clear")
-        if value is None and dungeon_keys:
-            value = any(alias in dungeon_keys for alias in BOSS_DUNGEON_ALIASES[boss])
-        flags[flag_name] = bool(value)
-    return flags
+    Handles both the ``dungeons`` dict (preferred) and legacy
+    ``first_clear_<name>`` boolean flat flags.
+    """
+    result: dict[str, int] = {}
+    normalized = {str(k).lower(): v for k, v in entry.items()}
+
+    # Primary: full dungeons dict with counts
+    dungeons_raw = normalized.get("dungeons")
+    if isinstance(dungeons_raw, dict):
+        for name, count in dungeons_raw.items():
+            key = str(name).strip().lower()
+            val = _as_int(count)
+            if key and val > 0:
+                result[key] = val
+
+    # Fallback: legacy first_clear_<name> boolean flags
+    for key, value in normalized.items():
+        if key.startswith("first_clear_") and value:
+            dungeon_name = key[len("first_clear_"):].replace("_", " ")
+            if dungeon_name and dungeon_name not in result:
+                result[dungeon_name] = 1
+
+    return result
 
 
 def _split_name(value: Any) -> tuple[str, str]:
@@ -129,10 +133,13 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
     """Aggregate leaderboard snapshots into player-centric rows."""
 
     players: dict[tuple[str, str], LeaderboardRecord] = {}
-    clear_flags: dict[tuple[str, str], dict[str, bool]] = {}
     build_profiles: dict[tuple[str, str], dict[str, str]] = {}
 
+    ts_pattern = re.compile(r"leaderboard_(\d{8}T\d{6}Z)")
+
     for path in sorted(snapshot_paths):
+        ts_match = ts_pattern.search(path.stem)
+        snapshot_ts = ts_match.group(1) if ts_match else ""
         payload = json.loads(path.read_text(encoding="utf-8"))
         entries = _extract_entries(payload)
         for entry in entries:
@@ -145,6 +152,9 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
             key = (account, character)
 
             dominant_skill, dominant_skill_count, slot_values = _extract_build_profile(entry)
+
+            entry_zone = _as_str(entry.get("zone") or entry.get("current_zone"), "")
+            entry_dungeons = _extract_dungeons(entry)
 
             record = players.get(key)
             if record is None:
@@ -160,9 +170,12 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                     snapshots_seen=0,
                     dominant_skill=dominant_skill,
                     dominant_skill_count=dominant_skill_count,
+                    zone=entry_zone,
+                    last_seen_at=snapshot_ts,
+                    dungeons={},
+                    dungeon_first_seen={},
                 )
                 players[key] = record
-                clear_flags[key] = _first_clear_flags(entry)
                 build_profiles[key] = slot_values
 
             record.snapshots_seen += 1
@@ -176,14 +189,21 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
             if record.stance == "unknown":
                 record.stance = _as_str(entry.get("stance") or (entry.get("build") or {}).get("stance"), "unknown")
 
+            if entry_zone:
+                record.zone = entry_zone
+            if snapshot_ts:
+                record.last_seen_at = snapshot_ts
+
             if dominant_skill_count > record.dominant_skill_count:
                 record.dominant_skill = dominant_skill
                 record.dominant_skill_count = dominant_skill_count
                 build_profiles[key] = slot_values
 
-            entry_flags = _first_clear_flags(entry)
-            for flag_name, value in entry_flags.items():
-                clear_flags[key][flag_name] = clear_flags[key][flag_name] or value
+            # Merge dungeon data: max count, earliest first-seen timestamp
+            for dname, dcount in entry_dungeons.items():
+                record.dungeons[dname] = max(record.dungeons.get(dname, 0), dcount)
+                if dname not in record.dungeon_first_seen and snapshot_ts:
+                    record.dungeon_first_seen[dname] = snapshot_ts
 
     rows: list[dict[str, Any]] = []
     for key, record in sorted(players.items(), key=lambda item: (-item[1].rupture_level, -item[1].build_score, item[0][0])):
@@ -207,7 +227,16 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                 "skill_name": record.dominant_skill,
                 "skill_modifier_count": record.dominant_skill_count,
                 "skill_mods": build_profiles.get(key, {}),
-                **clear_flags[key],
+                "zone": record.zone,
+                "last_seen_at": record.last_seen_at,
+                "dungeons": dict(sorted(
+                    record.dungeons.items(),
+                    key=lambda item: record.dungeon_first_seen.get(item[0], ""),
+                )),
+                "dungeon_first_seen": dict(sorted(
+                    record.dungeon_first_seen.items(),
+                    key=lambda item: item[1],
+                )),
                 **milestone_flags,
             }
         )
@@ -240,7 +269,10 @@ def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, 
         "skill_name",
         "skill_modifier_count",
         "skill_mods",
-        *[f"first_clear_{boss}" for boss in TRACKED_BOSSES],
+        "zone",
+        "last_seen_at",
+        "dungeons",
+        "dungeon_first_seen",
         *[f"cleared_r{milestone}" for milestone in RUPTURE_MILESTONES],
     ]
     with destination.open("w", newline="", encoding="utf-8") as handle:
@@ -249,3 +281,40 @@ def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, 
         writer.writerows(rows)
 
     return rows
+
+
+def reconcile_variant_transitions(
+    variant_rows: dict[str, list[dict[str, Any]]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Detect players who appear across variants and annotate with history.
+
+    When a player appears in both solo and fellowship, they are kept only in
+    the fellowship variant (the most recent / "promoted" board) and their
+    variant_history records both appearances.  The same applies for
+    hardcore_solo → hardcore_fellowship.
+    """
+    # Build a lookup: (account, character) → set of variant keys
+    player_variants: dict[tuple[str, str], set[str]] = {}
+    for variant_key, rows in variant_rows.items():
+        for row in rows:
+            pk = (row["account"], row["character"])
+            player_variants.setdefault(pk, set()).add(variant_key)
+
+    # Promotion pairs: solo → fellowship, hardcore_solo → hardcore_fellowship
+    promotions = [("solo", "fellowship"), ("hardcore_solo", "hardcore_fellowship")]
+
+    for solo_key, fellowship_key in promotions:
+        solo_rows = variant_rows.get(solo_key, [])
+        variant_rows[solo_key] = [
+            row for row in solo_rows
+            if fellowship_key not in player_variants.get((row["account"], row["character"]), set())
+        ]
+
+    # Annotate all remaining rows with their full variant history
+    for variant_key, rows in variant_rows.items():
+        for row in rows:
+            pk = (row["account"], row["character"])
+            history = sorted(player_variants.get(pk, {variant_key}))
+            row["variant_history"] = history
+
+    return variant_rows

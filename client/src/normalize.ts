@@ -1,4 +1,4 @@
-import { BossKey, LeaderboardPayload, LeaderboardPlayer, SkillMods } from './types';
+import { LeaderboardPayload, LeaderboardPlayer, SkillMods } from './types';
 
 /** Raw shape coming from either the Python ETL (snake_case) or a pre-normalized payload (camelCase). */
 type LeaderboardJsonRow = {
@@ -15,12 +15,14 @@ type LeaderboardJsonRow = {
   seenMinutesEstimate?: unknown;
   seen_time_per_rupture?: unknown;
   seenTimePerRupture?: unknown;
-  first_clear_zul?: unknown;
-  first_clear_archeon?: unknown;
-  first_clear_bridge?: unknown;
-  first_clear_skorch?: unknown;
-  first_clear_dark?: unknown;
-  firstClears?: Partial<Record<BossKey, boolean>>;
+  dungeons?: unknown;
+  dungeon_first_seen?: unknown;
+  dungeonFirstSeen?: unknown;
+  zone?: unknown;
+  last_seen_at?: unknown;
+  lastSeenAt?: unknown;
+  variant_history?: unknown;
+  variantHistory?: unknown;
   skill_name?: unknown;
   skillName?: unknown;
   skill_modifier_count?: unknown;
@@ -64,6 +66,30 @@ function normalizeSkillMods(value: unknown): SkillMods {
   };
 }
 
+function normalizeVariantHistory(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string');
+}
+
+function normalizeDungeons(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object') return {};
+  const result: Record<string, number> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    const count = asNumber(v, 0);
+    if (count > 0) result[k] = count;
+  }
+  return result;
+}
+
+function normalizeDungeonFirstSeen(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') return {};
+  const result: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof v === 'string' && v.length > 0) result[k] = v;
+  }
+  return result;
+}
+
 export function normalizeRows(rows: unknown[]): LeaderboardPlayer[] {
   return rows
     .map((row): LeaderboardPlayer | null => {
@@ -78,13 +104,11 @@ export function normalizeRows(rows: unknown[]): LeaderboardPlayer[] {
         ruptureLevel: asNumber(data.ruptureLevel ?? data.rupture_level),
         seenMinutesEstimate: asNumber(data.seenMinutesEstimate ?? data.seen_minutes_estimate),
         seenTimePerRupture: asNumber(data.seenTimePerRupture ?? data.seen_time_per_rupture),
-        firstClears: {
-          zul: asBoolean(data.firstClears?.zul ?? data.first_clear_zul),
-          archeon: asBoolean(data.firstClears?.archeon ?? data.first_clear_archeon),
-          bridge: asBoolean(data.firstClears?.bridge ?? data.first_clear_bridge),
-          skorch: asBoolean(data.firstClears?.skorch ?? data.first_clear_skorch),
-          dark: asBoolean(data.firstClears?.dark ?? data.first_clear_dark),
-        },
+        dungeons: normalizeDungeons(data.dungeons),
+        dungeonFirstSeen: normalizeDungeonFirstSeen(data.dungeonFirstSeen ?? data.dungeon_first_seen),
+        zone: asString(data.zone, ''),
+        lastSeenAt: asString(data.lastSeenAt ?? data.last_seen_at, ''),
+        variantHistory: normalizeVariantHistory(data.variantHistory ?? data.variant_history),
         skillName: asString(data.skillName ?? data.skill_name, ''),
         skillModifierCount: asNumber(data.skillModifierCount ?? data.skill_modifier_count),
         skillMods: normalizeSkillMods(data.skillMods ?? data.skill_mods),

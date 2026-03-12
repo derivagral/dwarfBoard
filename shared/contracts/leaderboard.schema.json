@@ -51,20 +51,18 @@
       "type": "number",
       "minimum": 0
     },
-    "first_clear_zul": {
-      "type": "boolean"
+    "dungeons": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
     },
-    "first_clear_archeon": {
-      "type": "boolean"
-    },
-    "first_clear_bridge": {
-      "type": "boolean"
-    },
-    "first_clear_skorch": {
-      "type": "boolean"
-    },
-    "first_clear_dark": {
-      "type": "boolean"
+    "dungeon_first_seen": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "cleared_r18": {
       "type": "boolean"
@@ -86,6 +84,18 @@
     },
     "cleared_r200": {
       "type": "boolean"
+    },
+    "zone": {
+      "type": "string"
+    },
+    "last_seen_at": {
+      "type": "string"
+    },
+    "variant_history": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "skill_name": {
       "type": "string"
