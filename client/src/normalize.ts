@@ -74,7 +74,7 @@ function normalizeStance(value: unknown): string {
   const compact = normalized.replace(/\s+/g, '');
 
   if (normalized === 'bow') return 'bow';
-  if (normalized === 'wand' || "magery") return 'magery';
+  if (normalized === 'wand' || normalized === 'magery') return 'magery';
   if (normalized === 'maul' || normalized === 'polearm' || normalized === 'pole arm') return 'maul';
   if (normalized === 'spear') return 'spear';
   if (normalized === 'scythe') return 'scythe';
