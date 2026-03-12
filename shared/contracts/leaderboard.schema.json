@@ -29,7 +29,17 @@
     },
     "stance": {
       "type": "string",
-      "minLength": 1
+      "enum": [
+        "bow",
+        "wand",
+        "maul",
+        "spear",
+        "sword",
+        "axe",
+        "fists",
+        "scythe",
+        "unknown"
+      ]
     },
     "rupture_level": {
       "type": "integer",

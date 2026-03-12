@@ -60,6 +60,44 @@ def _as_str(value: Any, fallback: str = "") -> str:
     return text or fallback
 
 
+def _normalize_stance(value: Any) -> str:
+    """Normalize raw stance names into one of the supported buckets."""
+    raw = _as_str(value, "").lower()
+    if not raw:
+        return "unknown"
+
+    normalized = re.sub(r"[^a-z0-9]+", " ", raw).strip()
+    compact = normalized.replace(" ", "")
+
+    if normalized in {"bow"}:
+        return "bow"
+    if normalized in {"wand"}:
+        return "wand"
+    if normalized in {"maul", "polearm", "pole arm"}:
+        return "maul"
+    if normalized in {"spear"}:
+        return "spear"
+    if normalized in {"scythe"}:
+        return "scythe"
+    if normalized in {"fists", "fist", "common", "unarmed"}:
+        return "fists"
+    if normalized in {
+        "sword",
+        "dual",
+        "dual wield",
+        "dualwield",
+        "1h",
+        "1 h",
+        "one hand",
+        "one handed",
+    } or compact in {"onehand", "onehanded"}:
+        return "sword"
+    if normalized in {"axe", "2h", "2 h", "two hand", "two handed"} or compact in {"twohand", "twohanded"}:
+        return "axe"
+
+    return "unknown"
+
+
 def _extract_dungeons(entry: dict[str, Any]) -> dict[str, int]:
     """Extract dungeon name → clear count from an entry.
 
@@ -162,7 +200,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                     account=account,
                     character=character,
                     class_name=_as_str(entry.get("class") or entry.get("class_name"), "unknown"),
-                    stance=_as_str(entry.get("stance") or (entry.get("build") or {}).get("stance"), "unknown"),
+                    stance=_normalize_stance(entry.get("stance") or (entry.get("build") or {}).get("stance")),
                     rupture_level=_as_int(
                         entry.get("rupture") or entry.get("rupture_level") or entry.get("raptureLevel")
                     ),
@@ -187,7 +225,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
             if record.class_name == "unknown":
                 record.class_name = _as_str(entry.get("class") or entry.get("class_name"), "unknown")
             if record.stance == "unknown":
-                record.stance = _as_str(entry.get("stance") or (entry.get("build") or {}).get("stance"), "unknown")
+                record.stance = _normalize_stance(entry.get("stance") or (entry.get("build") or {}).get("stance"))
 
             if entry_zone:
                 record.zone = entry_zone
