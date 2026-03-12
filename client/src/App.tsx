@@ -3,19 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import './styles.css';
 import { leaderboardPlayers as mockPlayers } from './mockData';
 import { isPayloadWithVariants, normalizeRows } from './normalize';
-import { BossKey, LeaderboardPlayer, LeaderboardVariantKey, Milestone } from './types';
+import { LeaderboardPlayer, LeaderboardVariantKey, Milestone } from './types';
 
 const milestones: Milestone[] = [18, 30, 36, 75, 100, 125, 200];
-const bosses: BossKey[] = ['zul', 'archeon', 'bridge', 'skorch', 'darkDrythus', 'darkBridge', 'darkOlympus'];
-const bossDisplayNames: Record<BossKey, string> = {
-  zul: 'Zul',
-  archeon: 'Archeon',
-  bridge: 'Bridge',
-  skorch: 'Skorch',
-  darkDrythus: 'Dark Drythus',
-  darkBridge: 'Dark Bridge',
-  darkOlympus: 'Dark Olympus',
-};
 const variants: Array<{ key: LeaderboardVariantKey; label: string }> = [
   { key: 'solo', label: 'Solo' },
   { key: 'fellowship', label: 'Fellowship' },
@@ -27,9 +17,26 @@ function hasCleared(playerRupture: number, milestone: Milestone): boolean {
   return playerRupture >= milestone;
 }
 
+/** Return dungeon entries sorted by first-completion timestamp (earliest first). */
+function sortedDungeons(player: LeaderboardPlayer): Array<[string, number]> {
+  return Object.entries(player.dungeons).sort((a, b) => {
+    const tsA = player.dungeonFirstSeen[a[0]] ?? '';
+    const tsB = player.dungeonFirstSeen[b[0]] ?? '';
+    if (tsA !== tsB) return tsA < tsB ? -1 : 1;
+    return a[0].localeCompare(b[0]);
+  });
+}
+
+/** Title-case a lowercase dungeon name (e.g. "dark drythus" → "Dark Drythus"). */
+function dungeonDisplayName(name: string): string {
+  return name.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function buildTooltipText(player: LeaderboardPlayer): string {
-  const lines = ['Boss first clears:'];
-  for (const boss of bosses) lines.push(`- ${bossDisplayNames[boss]}: ${player.firstClears[boss] ? 'yes' : 'no'}`);
+  const lines = ['Dungeon clears (by first completion):'];
+  for (const [name, count] of sortedDungeons(player)) {
+    lines.push(`- ${dungeonDisplayName(name)}: ${count}`);
+  }
   lines.push('', 'Rupture milestones:');
   for (const m of milestones) lines.push(`- r${m}: ${hasCleared(player.ruptureLevel, m) ? 'cleared' : 'pending'}`);
   return lines.join('\n');
@@ -144,6 +151,7 @@ export default function App() {
             {players.map((player, idx) => {
               const rowKey = `${player.account}-${player.character}`;
               const skillMods = player.skillMods ?? {};
+              const dungeonEntries = sortedDungeons(player);
               return (
                 <tr key={rowKey}>
                   <td>{idx + 1}</td>
@@ -192,18 +200,19 @@ export default function App() {
                       onClick={() => setOpenClearsKey(openClearsKey === rowKey ? null : rowKey)}
                       title={buildTooltipText(player)}
                     >
-                      Details
+                      {dungeonEntries.length} dungeon{dungeonEntries.length !== 1 ? 's' : ''}
                     </button>
                     {openClearsKey === rowKey && (
                       <div className="inlineTooltip">
-                        <strong>Boss first clears</strong>
+                        <strong>Dungeon clears (first completion order)</strong>
                         <ul>
-                          {bosses.map((boss) => (
-                            <li key={boss}>
-                              <span>{bossDisplayNames[boss]}:</span> {player.firstClears[boss] ? 'yes' : 'no'}
+                          {dungeonEntries.map(([name, count]) => (
+                            <li key={name}>
+                              <span>{dungeonDisplayName(name)}:</span> {count}
                             </li>
                           ))}
                         </ul>
+                        {dungeonEntries.length === 0 && <p className="subtle">No dungeon clears recorded</p>}
                       </div>
                     )}
                   </td>
