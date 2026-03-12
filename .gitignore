@@ -208,6 +208,7 @@ __marimo__/
 
 # Node
 node_modules/
+*.tsbuildinfo
 
 # Local ETL fetch snapshots
 etl/data/raw/
