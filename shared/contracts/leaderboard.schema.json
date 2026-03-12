@@ -31,7 +31,7 @@
       "type": "string",
       "enum": [
         "bow",
-        "wand",
+        "magery",
         "maul",
         "spear",
         "sword",

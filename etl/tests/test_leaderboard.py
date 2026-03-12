@@ -274,7 +274,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
 
         stance_by_char = {row["character"]: row["stance"] for row in rows}
         self.assertEqual(stance_by_char["Bow"], "bow")
-        self.assertEqual(stance_by_char["Wand"], "wand")
+        self.assertEqual(stance_by_char["Wand"], "magery")
         self.assertEqual(stance_by_char["Maul"], "maul")
         self.assertEqual(stance_by_char["Spear"], "spear")
         self.assertEqual(stance_by_char["Sword"], "sword")
