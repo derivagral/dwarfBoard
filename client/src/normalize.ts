@@ -66,6 +66,50 @@ function normalizeSkillMods(value: unknown): SkillMods {
   };
 }
 
+function normalizeStance(value: unknown): string {
+  const raw = asString(value, '').toLowerCase();
+  if (!raw) return 'unknown';
+
+  const normalized = raw.replace(/[^a-z0-9]+/g, ' ').trim();
+  const compact = normalized.replace(/\s+/g, '');
+
+  if (normalized === 'bow') return 'bow';
+  if (normalized === 'wand') return 'wand';
+  if (normalized === 'maul' || normalized === 'polearm' || normalized === 'pole arm') return 'maul';
+  if (normalized === 'spear') return 'spear';
+  if (normalized === 'scythe') return 'scythe';
+  if (normalized === 'fists' || normalized === 'fist' || normalized === 'common' || normalized === 'unarmed') return 'fists';
+
+  if (
+    normalized === 'sword' ||
+    normalized === 'dual' ||
+    normalized === 'dual wield' ||
+    normalized === 'dualwield' ||
+    normalized === '1h' ||
+    normalized === '1 h' ||
+    normalized === 'one hand' ||
+    normalized === 'one handed' ||
+    compact === 'onehand' ||
+    compact === 'onehanded'
+  ) {
+    return 'sword';
+  }
+
+  if (
+    normalized === 'axe' ||
+    normalized === '2h' ||
+    normalized === '2 h' ||
+    normalized === 'two hand' ||
+    normalized === 'two handed' ||
+    compact === 'twohand' ||
+    compact === 'twohanded'
+  ) {
+    return 'axe';
+  }
+
+  return 'unknown';
+}
+
 function normalizeVariantHistory(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === 'string');
@@ -99,7 +143,7 @@ export function normalizeRows(rows: unknown[]): LeaderboardPlayer[] {
         account: asString(data.account),
         character: asString(data.character),
         className: asString(data.className ?? data.class_name),
-        stance: asString(data.stance),
+        stance: normalizeStance(data.stance),
         buildScore: asNumber(data.buildScore ?? data.build_score),
         ruptureLevel: asNumber(data.ruptureLevel ?? data.rupture_level),
         seenMinutesEstimate: asNumber(data.seenMinutesEstimate ?? data.seen_minutes_estimate),

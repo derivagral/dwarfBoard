@@ -45,7 +45,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
         self.assertEqual(row["character"], "Drake")
         self.assertEqual(row["rupture_level"], 434)
         self.assertEqual(row["build_score"], 1160)
-        self.assertEqual(row["stance"], "Sword")
+        self.assertEqual(row["stance"], "sword")
         self.assertEqual(row["skill_name"], "Burning Shield")
         self.assertEqual(row["skill_modifier_count"], 3)
         self.assertEqual(row["zone"], "Dark Drythus")
@@ -246,6 +246,42 @@ class LeaderboardPipelineTests(unittest.TestCase):
         self.assertEqual(dungeon_keys, ["zul", "skorch"])
         self.assertEqual(row["dungeon_first_seen"]["zul"], "20260301T100000Z")
         self.assertEqual(row["dungeon_first_seen"]["skorch"], "20260302T100000Z")
+
+
+    def test_build_leaderboard_rows_normalizes_stance_buckets(self) -> None:
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "s1.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {"account": "A", "character": "Bow", "stance": "Bow", "rupture": 1, "score": 1},
+                            {"account": "B", "character": "Wand", "stance": "wand", "rupture": 1, "score": 1},
+                            {"account": "C", "character": "Maul", "stance": "Polearm", "rupture": 1, "score": 1},
+                            {"account": "D", "character": "Spear", "stance": "Spear", "rupture": 1, "score": 1},
+                            {"account": "E", "character": "Sword", "stance": "Dual", "rupture": 1, "score": 1},
+                            {"account": "F", "character": "Axe", "stance": "2h", "rupture": 1, "score": 1},
+                            {"account": "G", "character": "Fists", "stance": "Common", "rupture": 1, "score": 1},
+                            {"account": "H", "character": "Scythe", "stance": "Scythe", "rupture": 1, "score": 1},
+                            {"account": "I", "character": "Unknown", "stance": "Laser", "rupture": 1, "score": 1},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+
+        stance_by_char = {row["character"]: row["stance"] for row in rows}
+        self.assertEqual(stance_by_char["Bow"], "bow")
+        self.assertEqual(stance_by_char["Wand"], "wand")
+        self.assertEqual(stance_by_char["Maul"], "maul")
+        self.assertEqual(stance_by_char["Spear"], "spear")
+        self.assertEqual(stance_by_char["Sword"], "sword")
+        self.assertEqual(stance_by_char["Axe"], "axe")
+        self.assertEqual(stance_by_char["Fists"], "fists")
+        self.assertEqual(stance_by_char["Scythe"], "scythe")
+        self.assertEqual(stance_by_char["Unknown"], "unknown")
 
     def test_run_leaderboard_pipeline_writes_output_csv(self) -> None:
         with TemporaryDirectory() as tmp:
