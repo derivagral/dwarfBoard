@@ -71,8 +71,8 @@ def _normalize_stance(value: Any) -> str:
 
     if normalized in {"bow"}:
         return "bow"
-    if normalized in {"wand"}:
-        return "wand"
+    if normalized in {"wand", "magery"}:
+        return "magery"
     if normalized in {"maul", "polearm", "pole arm"}:
         return "maul"
     if normalized in {"spear"}:
