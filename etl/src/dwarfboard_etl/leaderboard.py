@@ -167,7 +167,7 @@ def _extract_build_profile(entry: dict[str, Any]) -> tuple[str, int, dict[str, s
     return top_skills[0], top_count, slot_values
 
 
-def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 60) -> list[dict[str, Any]]:
+def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 10) -> list[dict[str, Any]]:
     """Aggregate leaderboard snapshots into player-centric rows."""
 
     players: dict[tuple[str, str], LeaderboardRecord] = {}
@@ -243,6 +243,17 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                 if dname not in record.dungeon_first_seen and snapshot_ts:
                     record.dungeon_first_seen[dname] = snapshot_ts
 
+    # Determine which players appear in the most recent snapshot for is_online
+    latest_players: set[tuple[str, str]] = set()
+    if snapshot_paths:
+        latest_payload = json.loads(snapshot_paths[-1].read_text(encoding="utf-8"))
+        for entry in _extract_entries(latest_payload):
+            acct = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "")
+            char = _as_str(entry.get("character") or entry.get("character_name"), "")
+            if not acct and not char:
+                acct, char = _split_name(entry.get("name"))
+            latest_players.add((acct or "unknown", char or "unknown"))
+
     rows: list[dict[str, Any]] = []
     for key, record in sorted(players.items(), key=lambda item: (-item[1].rupture_level, -item[1].build_score, item[0][0])):
         seen_minutes = record.snapshots_seen * interval_minutes
@@ -265,6 +276,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
                 "skill_name": record.dominant_skill,
                 "skill_modifier_count": record.dominant_skill_count,
                 "skill_mods": build_profiles.get(key, {}),
+                "is_online": key in latest_players,
                 "zone": record.zone,
                 "last_seen_at": record.last_seen_at,
                 "dungeons": dict(sorted(
@@ -282,7 +294,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 6
     return rows
 
 
-def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, interval_minutes: int = 60) -> list[dict[str, Any]]:
+def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, interval_minutes: int = 10) -> list[dict[str, Any]]:
     source_dir = Path(snapshots_dir)
     destination = Path(output_csv)
 
@@ -307,6 +319,7 @@ def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, 
         "skill_name",
         "skill_modifier_count",
         "skill_mods",
+        "is_online",
         "zone",
         "last_seen_at",
         "dungeons",

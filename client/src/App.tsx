@@ -163,7 +163,10 @@ export default function App() {
                       </span>
                     )}
                   </td>
-                  <td>{player.character}</td>
+                  <td>
+                    {player.character}
+                    {player.isOnline && <span className="online-dot" title="Online now" />}
+                  </td>
                   <td>{player.stance}</td>
                   <td>{player.zone || '-'}</td>
                   <td>

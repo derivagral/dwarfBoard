@@ -95,6 +95,9 @@
     "cleared_r200": {
       "type": "boolean"
     },
+    "is_online": {
+      "type": "boolean"
+    },
     "zone": {
       "type": "string"
     },

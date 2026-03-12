@@ -248,6 +248,44 @@ class LeaderboardPipelineTests(unittest.TestCase):
         self.assertEqual(row["dungeon_first_seen"]["skorch"], "20260302T100000Z")
 
 
+    def test_build_leaderboard_rows_tracks_is_online(self) -> None:
+        """Players in the latest snapshot should be marked is_online=True."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {"account": "A", "character": "C1", "rupture": 50, "score": 800},
+                            {"account": "B", "character": "C2", "rupture": 30, "score": 600},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (tmp_path / "leaderboard_20260302T100000Z_bbb.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {"account": "A", "character": "C1", "rupture": 55, "score": 850},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows(
+                [
+                    tmp_path / "leaderboard_20260301T100000Z_aaa.json",
+                    tmp_path / "leaderboard_20260302T100000Z_bbb.json",
+                ],
+                interval_minutes=10,
+            )
+
+        by_account = {row["account"]: row for row in rows}
+        self.assertTrue(by_account["A"]["is_online"])
+        self.assertFalse(by_account["B"]["is_online"])
+
     def test_build_leaderboard_rows_normalizes_stance_buckets(self) -> None:
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

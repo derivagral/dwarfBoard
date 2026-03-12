@@ -18,6 +18,8 @@ type LeaderboardJsonRow = {
   dungeons?: unknown;
   dungeon_first_seen?: unknown;
   dungeonFirstSeen?: unknown;
+  is_online?: unknown;
+  isOnline?: unknown;
   zone?: unknown;
   last_seen_at?: unknown;
   lastSeenAt?: unknown;
@@ -150,6 +152,7 @@ export function normalizeRows(rows: unknown[]): LeaderboardPlayer[] {
         seenTimePerRupture: asNumber(data.seenTimePerRupture ?? data.seen_time_per_rupture),
         dungeons: normalizeDungeons(data.dungeons),
         dungeonFirstSeen: normalizeDungeonFirstSeen(data.dungeonFirstSeen ?? data.dungeon_first_seen),
+        isOnline: asBoolean(data.isOnline ?? data.is_online),
         zone: asString(data.zone, ''),
         lastSeenAt: asString(data.lastSeenAt ?? data.last_seen_at, ''),
         variantHistory: normalizeVariantHistory(data.variantHistory ?? data.variant_history),
