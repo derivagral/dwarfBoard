@@ -264,6 +264,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                             {"account": "G", "character": "Fists", "stance": "Common", "rupture": 1, "score": 1},
                             {"account": "H", "character": "Scythe", "stance": "Scythe", "rupture": 1, "score": 1},
                             {"account": "I", "character": "Unknown", "stance": "Laser", "rupture": 1, "score": 1},
+                            {"account": "J", "character": "Magic", "stance": "Magic", "rupture": 1, "score": 1},
                         ]
                     }
                 ),
@@ -282,6 +283,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
         self.assertEqual(stance_by_char["Fists"], "fists")
         self.assertEqual(stance_by_char["Scythe"], "scythe")
         self.assertEqual(stance_by_char["Unknown"], "unknown")
+        self.assertEqual(stance_by_char["Magic"], "magery")
 
     def test_run_leaderboard_pipeline_writes_output_csv(self) -> None:
         with TemporaryDirectory() as tmp:
