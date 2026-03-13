@@ -6,13 +6,25 @@ import csv
 import json
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 RUPTURE_MILESTONES = (18, 30, 36, 75, 100, 125, 200)
 
 SKILL_MOD_SLOTS = ("goblet", "weapon", "horn", "belt", "trinket")
+
+
+_TS_FORMAT = "%Y%m%dT%H%M%SZ"
+
+
+def _parse_snapshot_ts(ts_str: str) -> datetime | None:
+    """Parse a snapshot timestamp string like '20260301T100000Z' into a datetime."""
+    try:
+        return datetime.strptime(ts_str, _TS_FORMAT).replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
 
 
 @dataclass(slots=True)
@@ -30,6 +42,7 @@ class LeaderboardRecord:
     last_seen_at: str
     dungeons: dict[str, int]
     dungeon_first_seen: dict[str, str]
+    snapshot_timestamps: list[str] = field(default_factory=list)
 
 
 def _extract_entries(payload: Any) -> list[dict[str, Any]]:
@@ -167,6 +180,27 @@ def _extract_build_profile(entry: dict[str, Any]) -> tuple[str, int, dict[str, s
     return top_skills[0], top_count, slot_values
 
 
+def _compute_seen_minutes(snapshot_timestamps: list[str], interval_minutes: int) -> float:
+    """Compute seen time from actual snapshot timestamp deltas.
+
+    For players seen in 2+ snapshots, sums the real time deltas between
+    consecutive appearances.  For players seen in only 1 snapshot (first
+    appearance or season start), returns -1 to signal the display layer
+    should show a placeholder like ``<10m``.
+    """
+    if len(snapshot_timestamps) < 2:
+        return -1
+
+    parsed = sorted(dt for ts in snapshot_timestamps if (dt := _parse_snapshot_ts(ts)) is not None)
+    if len(parsed) < 2:
+        return -1
+
+    total_seconds = sum(
+        (parsed[i + 1] - parsed[i]).total_seconds() for i in range(len(parsed) - 1)
+    )
+    return round(total_seconds / 60, 2)
+
+
 def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 10) -> list[dict[str, Any]]:
     """Aggregate leaderboard snapshots into player-centric rows."""
 
@@ -217,6 +251,8 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
                 build_profiles[key] = slot_values
 
             record.snapshots_seen += 1
+            if snapshot_ts:
+                record.snapshot_timestamps.append(snapshot_ts)
             record.rupture_level = max(
                 record.rupture_level,
                 _as_int(entry.get("rupture") or entry.get("rupture_level") or entry.get("raptureLevel")),
@@ -256,8 +292,13 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
 
     rows: list[dict[str, Any]] = []
     for key, record in sorted(players.items(), key=lambda item: (-item[1].rupture_level, -item[1].build_score, item[0][0])):
-        seen_minutes = record.snapshots_seen * interval_minutes
-        seen_time_per_rupture = round(seen_minutes / record.rupture_level, 2) if record.rupture_level > 0 else 0.0
+        seen_minutes = _compute_seen_minutes(record.snapshot_timestamps, interval_minutes)
+        if seen_minutes < 0:
+            seen_time_per_rupture = -1.0
+        elif record.rupture_level > 0:
+            seen_time_per_rupture = round(seen_minutes / record.rupture_level, 2)
+        else:
+            seen_time_per_rupture = 0.0
         milestone_flags = {
             f"cleared_r{milestone}": record.rupture_level >= milestone for milestone in RUPTURE_MILESTONES
         }

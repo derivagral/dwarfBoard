@@ -193,8 +193,10 @@ export default function App() {
                   </td>
                   <td>{player.ruptureLevel}</td>
                   <td>
-                    {player.seenTimePerRupture}m
-                    <span className="subtle"> ({player.seenMinutesEstimate}m total)</span>
+                    {player.seenMinutesEstimate < 0
+                      ? <span className="subtle">&lt;10m</span>
+                      : <>{player.seenTimePerRupture}m<span className="subtle"> ({player.seenMinutesEstimate}m total)</span></>
+                    }
                   </td>
                   <td>
                     <button
