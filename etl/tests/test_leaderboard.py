@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from dwarfboard_etl.leaderboard import build_leaderboard_rows, reconcile_variant_transitions, run_leaderboard_pipeline
+from dwarfboard_etl.leaderboard import _compute_seen_minutes, build_leaderboard_rows, reconcile_variant_transitions, run_leaderboard_pipeline
 
 
 class LeaderboardPipelineTests(unittest.TestCase):
@@ -58,7 +58,8 @@ class LeaderboardPipelineTests(unittest.TestCase):
     def test_build_leaderboard_rows_estimates_seen_time_and_flags(self) -> None:
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            (tmp_path / "s1.json").write_text(
+            # Use timestamped filenames so delta-based calc works (10 min apart)
+            (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
                 json.dumps(
                     {
                         "entries": [
@@ -84,7 +85,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (tmp_path / "s2.json").write_text(
+            (tmp_path / "leaderboard_20260301T101000Z_bbb.json").write_text(
                 json.dumps(
                     {
                         "entries": [
@@ -103,13 +104,19 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows([tmp_path / "s1.json", tmp_path / "s2.json"], interval_minutes=10)
+            rows = build_leaderboard_rows(
+                [
+                    tmp_path / "leaderboard_20260301T100000Z_aaa.json",
+                    tmp_path / "leaderboard_20260301T101000Z_bbb.json",
+                ],
+                interval_minutes=10,
+            )
 
         self.assertEqual(len(rows), 1)
         row = rows[0]
-        self.assertEqual(row["seen_minutes_estimate"], 20)
+        self.assertEqual(row["seen_minutes_estimate"], 10)  # 10 min delta between timestamps
         self.assertEqual(row["snapshots_seen"], 2)
-        self.assertAlmostEqual(row["seen_time_per_rupture"], 0.27)
+        self.assertAlmostEqual(row["seen_time_per_rupture"], 0.13)  # 10 / 75
         self.assertEqual(row["skill_name"], "2+")
         self.assertEqual(row["skill_modifier_count"], 2)
         # Dungeons should be merged: max count across snapshots
@@ -248,6 +255,70 @@ class LeaderboardPipelineTests(unittest.TestCase):
         self.assertEqual(row["dungeon_first_seen"]["skorch"], "20260302T100000Z")
 
 
+    def test_build_leaderboard_rows_tracks_is_online(self) -> None:
+        """Players in the latest snapshot should be marked is_online=True."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {"account": "A", "character": "C1", "rupture": 50, "score": 800},
+                            {"account": "B", "character": "C2", "rupture": 30, "score": 600},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (tmp_path / "leaderboard_20260302T100000Z_bbb.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {"account": "A", "character": "C1", "rupture": 55, "score": 850},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows(
+                [
+                    tmp_path / "leaderboard_20260301T100000Z_aaa.json",
+                    tmp_path / "leaderboard_20260302T100000Z_bbb.json",
+                ],
+                interval_minutes=10,
+            )
+
+        by_account = {row["account"]: row for row in rows}
+        self.assertTrue(by_account["A"]["is_online"])
+        self.assertFalse(by_account["B"]["is_online"])
+
+    def test_compute_seen_minutes_uses_timestamp_deltas(self) -> None:
+        """seen_minutes should be the sum of actual deltas, not count * interval."""
+        # 3 snapshots: 10:00, 10:10, 10:21 → deltas of 10 + 11 = 21 minutes
+        timestamps = ["20260301T100000Z", "20260301T101000Z", "20260301T102100Z"]
+        self.assertEqual(_compute_seen_minutes(timestamps, interval_minutes=10), 21)
+
+    def test_compute_seen_minutes_single_snapshot_returns_sentinel(self) -> None:
+        """A player seen in only 1 snapshot should return -1 (first appearance)."""
+        self.assertEqual(_compute_seen_minutes(["20260301T100000Z"], interval_minutes=10), -1)
+
+    def test_compute_seen_minutes_no_timestamps_returns_sentinel(self) -> None:
+        """Files without parseable timestamps should return -1."""
+        self.assertEqual(_compute_seen_minutes([], interval_minutes=10), -1)
+
+    def test_first_appearance_produces_sentinel_in_output(self) -> None:
+        """Single snapshot players should get seen_minutes_estimate=-1."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
+                json.dumps({"entries": [{"account": "A", "character": "C", "rupture": 50, "score": 800}]}),
+                encoding="utf-8",
+            )
+            rows = build_leaderboard_rows([tmp_path / "leaderboard_20260301T100000Z_aaa.json"], interval_minutes=10)
+        self.assertEqual(rows[0]["seen_minutes_estimate"], -1)
+        self.assertEqual(rows[0]["seen_time_per_rupture"], -1)
+
     def test_build_leaderboard_rows_normalizes_stance_buckets(self) -> None:
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -308,7 +379,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
 
             self.assertEqual(len(csv_rows), 1)
             self.assertEqual(csv_rows[0]["account"], "A")
-            self.assertEqual(csv_rows[0]["seen_minutes_estimate"], "60")
+            self.assertEqual(csv_rows[0]["seen_minutes_estimate"], "-1")  # single snapshot → placeholder
             self.assertIn("dungeons", csv_rows[0])
             self.assertIn("dungeon_first_seen", csv_rows[0])
 

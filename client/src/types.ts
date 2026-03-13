@@ -21,6 +21,7 @@ export interface LeaderboardPlayer {
   seenTimePerRupture: number;
   dungeons: Record<string, number>;
   dungeonFirstSeen: Record<string, string>;
+  isOnline?: boolean;
   zone?: string;
   lastSeenAt?: string;
   variantHistory?: string[];

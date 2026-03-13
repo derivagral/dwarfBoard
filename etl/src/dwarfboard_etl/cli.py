@@ -28,8 +28,8 @@ def build_parser() -> argparse.ArgumentParser:
     leaderboard_parser.add_argument(
         "--interval-minutes",
         type=int,
-        default=60,
-        help="Scan interval used to estimate seen time (use 10 once fetch cadence is updated)",
+        default=10,
+        help="Scan interval in minutes used to estimate seen time",
     )
     fetch_parser.add_argument("--url", required=True, help="Leaderboard endpoint URL")
     fetch_parser.add_argument(

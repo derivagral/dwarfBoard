@@ -60,6 +60,14 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "output_dir=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
 
+      - name: Restore cached snapshots
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.config.outputs.output_dir }}
+          key: snapshots-v1-${{ github.run_id }}
+          restore-keys: |
+            snapshots-v1-
+
       - name: Fetch all variant snapshots
         run: |
           BASE_URL="${{ steps.config.outputs.url }}"
@@ -77,6 +85,22 @@ jobs:
               --url "${BASE_URL}${VARIANTS[$variant]}" \
               --output-dir "${OUTPUT_DIR}/${variant}"
           done
+
+      - name: Prune old snapshots (keep 7 days)
+        run: |
+          OUTPUT_DIR="${{ steps.config.outputs.output_dir }}"
+          for dir in "$OUTPUT_DIR"/*/; do
+            [ -d "$dir" ] || continue
+            # Keep only the 1008 most recent snapshots per variant (7 days at 10-min intervals)
+            ls -1t "$dir"leaderboard_*.json 2>/dev/null | tail -n +1009 | xargs -r rm --
+            ls -1t "$dir"leaderboard_*.meta.json 2>/dev/null | tail -n +1009 | xargs -r rm --
+          done
+
+      - name: Save snapshot cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.config.outputs.output_dir }}
+          key: snapshots-v1-${{ github.run_id }}
 
       - name: Upload fetched artifacts
         uses: actions/upload-artifact@v4

@@ -104,6 +104,16 @@ body {
   text-transform: capitalize;
 }
 
+.online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 @media (max-width: 900px) {
   .page {
     padding: 16px;

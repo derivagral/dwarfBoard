@@ -48,11 +48,33 @@ The repo includes `.github/workflows/fetch-leaderboard.yml`.
 ## Leaderboard aggregate (player-centric metrics)
 ```bash
 cd etl
-PYTHONPATH=src python -m dwarfboard_etl.cli leaderboard-aggregate --snapshots-dir data/raw --output data/leaderboard_metrics.csv --interval-minutes 60
+PYTHONPATH=src python -m dwarfboard_etl.cli leaderboard-aggregate --snapshots-dir data/raw --output data/leaderboard_metrics.csv --interval-minutes 10
 ```
 
-Output includes scaffolding for:
+Output includes:
 - Seen-time estimates (`seen_minutes_estimate`)
 - Seen Time / Rupture (`seen_time_per_rupture`)
+- Online status (`is_online`)
 - First-clear flags (`zul`, `archeon`, `bridge`, `skorch`, `dark`)
 - Rupture milestone flags (`r18`, `r30`, `r36`, `r75`, `r100`, `r125`, `r200`)
+
+### Playtime calculation
+
+Playtime (`seen_minutes_estimate`) is computed from actual timestamp deltas
+between consecutive snapshots in which a player appears. The fetch workflow
+runs every 10 minutes and snapshots are cached across runs, so the
+aggregation always has the full snapshot history available.
+
+- **2+ snapshots**: sum of real time deltas between consecutive appearances.
+  This naturally handles execution drift and missed runs — if a cron fires
+  at :00, :11, :19 the deltas are 11 + 8 = 19 minutes, not 3 × 10 = 30.
+- **1 snapshot** (first appearance or new season): returns `-1`, displayed
+  as `<10m` in the UI since there is no delta to measure.
+- `--interval-minutes` (default 10) is kept as a CLI parameter but is no
+  longer used in the main calculation; it only serves as the fallback label
+  shown for single-snapshot players.
+
+### Online status
+
+`is_online` is `true` when a character appeared in the most recent snapshot
+in the batch. The client displays a green dot next to the character name.

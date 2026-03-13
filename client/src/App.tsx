@@ -163,7 +163,10 @@ export default function App() {
                       </span>
                     )}
                   </td>
-                  <td>{player.character}</td>
+                  <td>
+                    {player.character}
+                    {player.isOnline && <span className="online-dot" title="Online now" />}
+                  </td>
                   <td>{player.stance}</td>
                   <td>{player.zone || '-'}</td>
                   <td>
@@ -190,8 +193,10 @@ export default function App() {
                   </td>
                   <td>{player.ruptureLevel}</td>
                   <td>
-                    {player.seenTimePerRupture}m
-                    <span className="subtle"> ({player.seenMinutesEstimate}m total)</span>
+                    {player.seenMinutesEstimate < 0
+                      ? <span className="subtle">&lt;10m</span>
+                      : <>{player.seenTimePerRupture}m<span className="subtle"> ({player.seenMinutesEstimate}m total)</span></>
+                    }
                   </td>
                   <td>
                     <button
