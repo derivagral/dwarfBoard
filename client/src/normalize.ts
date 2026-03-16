@@ -1,4 +1,4 @@
-import { LeaderboardPayload, LeaderboardPlayer, SkillMods } from './types';
+import { Equipment, LeaderboardPayload, LeaderboardPlayer, SkillMods } from './types';
 
 /** Raw shape coming from either the Python ETL (snake_case) or a pre-normalized payload (camelCase). */
 type LeaderboardJsonRow = {
@@ -31,6 +31,7 @@ type LeaderboardJsonRow = {
   skillModifierCount?: unknown;
   skill_mods?: unknown;
   skillMods?: unknown;
+  equipment?: unknown;
 };
 
 export function asNumber(value: unknown, fallback = 0): number {
@@ -54,6 +55,33 @@ export function asBoolean(value: unknown): boolean {
     return lower === 'true' || lower === '1' || lower === 'yes';
   }
   return false;
+}
+
+/**
+ * Return the string only when it looks predominantly English (Basic Latin).
+ * Strings where >50% of non-whitespace chars are outside U+0000–U+007F are
+ * treated as translated / non-English and replaced with empty string.
+ */
+export function sanitizeDisplayString(value: string): string {
+  const nonWs = [...value].filter((ch) => !/\s/.test(ch));
+  if (nonWs.length === 0) return '';
+  const latinCount = nonWs.filter((ch) => ch.charCodeAt(0) <= 0x7f).length;
+  if (latinCount / nonWs.length < 0.5) return '';
+  return value;
+}
+
+function normalizeEquipment(value: unknown): Equipment {
+  if (!value || typeof value !== 'object') return {};
+  const eq = value as Record<string, unknown>;
+  return {
+    amulet: asString(eq.amulet, ''),
+    bracer: asString(eq.bracer, ''),
+    helmet: asString(eq.helmet, ''),
+    relic: asString(eq.relic, ''),
+    boots: asString(eq.boots, ''),
+    rings1: asString(eq.rings1, ''),
+    rings2: asString(eq.rings2, ''),
+  };
 }
 
 function normalizeSkillMods(value: unknown): SkillMods {
@@ -159,6 +187,7 @@ export function normalizeRows(rows: unknown[]): LeaderboardPlayer[] {
         skillName: asString(data.skillName ?? data.skill_name, ''),
         skillModifierCount: asNumber(data.skillModifierCount ?? data.skill_modifier_count),
         skillMods: normalizeSkillMods(data.skillMods ?? data.skill_mods),
+        equipment: normalizeEquipment(data.equipment),
       };
     })
     .filter((row): row is LeaderboardPlayer => row !== null);

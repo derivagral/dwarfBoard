@@ -15,6 +15,8 @@ RUPTURE_MILESTONES = (18, 30, 36, 75, 100, 125, 200)
 
 SKILL_MOD_SLOTS = ("goblet", "weapon", "horn", "belt", "trinket")
 
+EQUIPMENT_SLOTS = ("amulet", "bracer", "helmet", "relic", "boots", "rings1", "rings2")
+
 
 _TS_FORMAT = "%Y%m%dT%H%M%SZ"
 
@@ -42,6 +44,7 @@ class LeaderboardRecord:
     last_seen_at: str
     dungeons: dict[str, int]
     dungeon_first_seen: dict[str, str]
+    equipment: dict[str, str] = field(default_factory=dict)
     snapshot_timestamps: list[str] = field(default_factory=list)
 
 
@@ -55,6 +58,22 @@ def _extract_entries(payload: Any) -> list[dict[str, Any]]:
             if isinstance(candidate, list):
                 return [row for row in candidate if isinstance(row, dict)]
     return []
+
+
+def _sanitize_display_str(value: str) -> str:
+    """Return *value* only when it looks predominantly English (Basic Latin).
+
+    Strings where more than half of the non-whitespace characters fall outside
+    the Basic Latin block (U+0000–U+007F) are treated as translated / non-English
+    and replaced with an empty string.
+    """
+    non_ws = [ch for ch in value if not ch.isspace()]
+    if not non_ws:
+        return ""
+    latin_count = sum(1 for ch in non_ws if ord(ch) <= 0x7F)
+    if latin_count / len(non_ws) < 0.5:
+        return ""
+    return value
 
 
 def _as_int(value: Any) -> int:
@@ -153,13 +172,22 @@ def _skill_from_modifier(value: str) -> str:
     return value.split(":", 1)[0].strip()
 
 
-def _extract_build_profile(entry: dict[str, Any]) -> tuple[str, int, dict[str, str]]:
+def _extract_build_profile(entry: dict[str, Any]) -> tuple[str, int, dict[str, str], dict[str, str]]:
+    """Extract skill mods and equipment from an entry's build object.
+
+    Returns (dominant_skill, dominant_skill_count, slot_values, equipment).
+    """
     build_raw = entry.get("build")
     equipment_mods: dict[str, Any] = {}
+    equipment: dict[str, str] = {}
     if isinstance(build_raw, dict):
         mods_raw = build_raw.get("equipmentMods")
         if isinstance(mods_raw, dict):
             equipment_mods = mods_raw
+        for slot in EQUIPMENT_SLOTS:
+            raw_val = _sanitize_display_str(_as_str(build_raw.get(slot), ""))
+            if raw_val:
+                equipment[slot] = raw_val
 
     slot_values: dict[str, str] = {
         slot: _as_str(equipment_mods.get(slot), "")
@@ -170,14 +198,14 @@ def _extract_build_profile(entry: dict[str, Any]) -> tuple[str, int, dict[str, s
     )
 
     if not skill_counter:
-        return "unknown", 0, slot_values
+        return "unknown", 0, slot_values, equipment
 
     highest = skill_counter.most_common()
     top_count = highest[0][1]
     top_skills = sorted(skill for skill, count in highest if count == top_count)
     if len(top_skills) > 1:
-        return "2+", top_count, slot_values
-    return top_skills[0], top_count, slot_values
+        return "2+", top_count, slot_values, equipment
+    return top_skills[0], top_count, slot_values, equipment
 
 
 def _compute_seen_minutes(snapshot_timestamps: list[str], interval_minutes: int) -> float:
@@ -223,7 +251,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
             character = character or "unknown"
             key = (account, character)
 
-            dominant_skill, dominant_skill_count, slot_values = _extract_build_profile(entry)
+            dominant_skill, dominant_skill_count, slot_values, entry_equipment = _extract_build_profile(entry)
 
             entry_zone = _as_str(entry.get("zone") or entry.get("current_zone"), "")
             entry_dungeons = _extract_dungeons(entry)
@@ -249,6 +277,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
                 )
                 players[key] = record
                 build_profiles[key] = slot_values
+                record.equipment = entry_equipment
 
             record.snapshots_seen += 1
             if snapshot_ts:
@@ -272,6 +301,10 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
                 record.dominant_skill = dominant_skill
                 record.dominant_skill_count = dominant_skill_count
                 build_profiles[key] = slot_values
+
+            # Update equipment with latest non-empty values
+            if entry_equipment:
+                record.equipment.update(entry_equipment)
 
             # Merge dungeon data: max count, earliest first-seen timestamp
             for dname, dcount in entry_dungeons.items():
@@ -317,6 +350,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
                 "skill_name": record.dominant_skill,
                 "skill_modifier_count": record.dominant_skill_count,
                 "skill_mods": build_profiles.get(key, {}),
+                "equipment": record.equipment,
                 "is_online": key in latest_players,
                 "zone": record.zone,
                 "last_seen_at": record.last_seen_at,
@@ -360,6 +394,7 @@ def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, 
         "skill_name",
         "skill_modifier_count",
         "skill_mods",
+        "equipment",
         "is_online",
         "zone",
         "last_seen_at",

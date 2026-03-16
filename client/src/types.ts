@@ -10,6 +10,16 @@ export interface SkillMods {
   trinket?: string;
 }
 
+export interface Equipment {
+  amulet?: string;
+  bracer?: string;
+  helmet?: string;
+  relic?: string;
+  boots?: string;
+  rings1?: string;
+  rings2?: string;
+}
+
 export interface LeaderboardPlayer {
   account: string;
   character: string;
@@ -28,6 +38,7 @@ export interface LeaderboardPlayer {
   skillName?: string;
   skillModifierCount?: number;
   skillMods?: SkillMods;
+  equipment?: Equipment;
 }
 
 export interface LeaderboardPayload {

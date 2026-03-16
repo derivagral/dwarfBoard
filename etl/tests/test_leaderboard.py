@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from dwarfboard_etl.leaderboard import _compute_seen_minutes, build_leaderboard_rows, reconcile_variant_transitions, run_leaderboard_pipeline
+from dwarfboard_etl.leaderboard import _compute_seen_minutes, _sanitize_display_str, build_leaderboard_rows, reconcile_variant_transitions, run_leaderboard_pipeline
 
 
 class LeaderboardPipelineTests(unittest.TestCase):
@@ -411,6 +411,98 @@ class LeaderboardPipelineTests(unittest.TestCase):
 
         # Solo-only player B/D should have solo-only history
         self.assertEqual(result["solo"][0]["variant_history"], ["solo"])
+
+
+    def test_build_leaderboard_rows_extracts_equipment_from_build(self) -> None:
+        """Equipment fields under build should be extracted and sanitized."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "s1.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {
+                                "account": "A",
+                                "character": "C",
+                                "rupture": 50,
+                                "score": 800,
+                                "build": {
+                                    "stance": "Sword",
+                                    "amulet": "Phoenix Pendant of Warding",
+                                    "bracer": "Dragonscale Vambrace",
+                                    "helmet": "Crown of the Fallen King",
+                                    "relic": "",
+                                    "boots": "Flamestep Greaves",
+                                    "rings1": "Band of Eternal Fire",
+                                    "rings2": "",
+                                },
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+
+        row = rows[0]
+        eq = row["equipment"]
+        self.assertEqual(eq["amulet"], "Phoenix Pendant of Warding")
+        self.assertEqual(eq["bracer"], "Dragonscale Vambrace")
+        self.assertEqual(eq["helmet"], "Crown of the Fallen King")
+        self.assertEqual(eq["boots"], "Flamestep Greaves")
+        self.assertEqual(eq["rings1"], "Band of Eternal Fire")
+        # Empty strings should not be included
+        self.assertNotIn("relic", eq)
+        self.assertNotIn("rings2", eq)
+
+    def test_build_leaderboard_rows_filters_non_english_equipment(self) -> None:
+        """Equipment values that are predominantly non-Latin should be filtered out."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "s1.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {
+                                "account": "A",
+                                "character": "C",
+                                "rupture": 50,
+                                "score": 800,
+                                "build": {
+                                    "amulet": "\u706b\u7130\u62a4\u8eab\u7b26",
+                                    "bracer": "English Bracer",
+                                    "helmet": "\u30d8\u30eb\u30e1\u30c3\u30c8\u306e\u738b",
+                                },
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+
+        eq = rows[0]["equipment"]
+        # Non-English amulet and helmet should be filtered out
+        self.assertNotIn("amulet", eq)
+        self.assertNotIn("helmet", eq)
+        # English bracer should be preserved
+        self.assertEqual(eq["bracer"], "English Bracer")
+
+    def test_sanitize_display_str_preserves_english(self) -> None:
+        self.assertEqual(_sanitize_display_str("Fire Amulet +10%"), "Fire Amulet +10%")
+
+    def test_sanitize_display_str_filters_non_latin(self) -> None:
+        self.assertEqual(_sanitize_display_str("\u706b\u7130\u62a4\u8eab\u7b26"), "")
+
+    def test_sanitize_display_str_preserves_mixed_with_mostly_latin(self) -> None:
+        # More than 50% Latin should pass
+        self.assertEqual(_sanitize_display_str("Fire Caf\u00e9 Amulet"), "Fire Caf\u00e9 Amulet")
+
+    def test_sanitize_display_str_empty_and_whitespace(self) -> None:
+        self.assertEqual(_sanitize_display_str(""), "")
+        self.assertEqual(_sanitize_display_str("   "), "")
 
 
 if __name__ == "__main__":
