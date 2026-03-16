@@ -137,6 +137,33 @@
         }
       },
       "additionalProperties": false
+    },
+    "equipment": {
+      "type": "object",
+      "properties": {
+        "amulet": {
+          "type": "string"
+        },
+        "bracer": {
+          "type": "string"
+        },
+        "helmet": {
+          "type": "string"
+        },
+        "relic": {
+          "type": "string"
+        },
+        "boots": {
+          "type": "string"
+        },
+        "rings1": {
+          "type": "string"
+        },
+        "rings2": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

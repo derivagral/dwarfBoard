@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import './styles.css';
 import { leaderboardPlayers as mockPlayers } from './mockData';
-import { isPayloadWithVariants, normalizeRows } from './normalize';
+import { isPayloadWithVariants, normalizeRows, sanitizeDisplayString } from './normalize';
 import { LeaderboardPlayer, LeaderboardVariantKey, Milestone } from './types';
 
 const milestones: Milestone[] = [18, 30, 36, 75, 100, 125, 200];
@@ -43,10 +43,26 @@ function buildTooltipText(player: LeaderboardPlayer): string {
 }
 
 function buildSkillSummary(player: LeaderboardPlayer): string {
-  if (!player.skillName) return `${player.buildScore}`;
-  if ((player.skillModifierCount ?? 0) <= 0) return `${player.buildScore} • ${player.skillName}`;
-  return `${player.buildScore} • ${player.skillName} (${player.skillModifierCount}/5)`;
+  if (!player.skillName) return '-';
+  if ((player.skillModifierCount ?? 0) <= 0) return player.skillName;
+  return `${player.skillName} (${player.skillModifierCount}/5)`;
 }
+
+/** Title-case a normalized stance value (e.g. "sword" → "Sword"). */
+function stanceDisplayName(stance: string): string {
+  if (!stance || stance === 'unknown') return 'Unknown';
+  return stance.charAt(0).toUpperCase() + stance.slice(1);
+}
+
+const EQUIPMENT_SLOT_LABELS: Record<string, string> = {
+  amulet: 'Amulet',
+  bracer: 'Bracer',
+  helmet: 'Helmet',
+  relic: 'Relic',
+  boots: 'Boots',
+  rings1: 'Ring 1',
+  rings2: 'Ring 2',
+};
 
 export default function App() {
   const [variant, setVariant] = useState<LeaderboardVariantKey>('solo');
@@ -110,7 +126,7 @@ export default function App() {
     <main className="page">
       <header className="header">
         <h1>dwarfBoard Leaderboard</h1>
-        <p>Base view includes Build, Rupture, and Seen Time / Rupture. Click clears/build badges for details.</p>
+        <p>Base view includes Level, Build, Rupture, and Seen Time / Rupture. Click clears/build badges for details.</p>
         <p className="subtle">{sourceLabel}</p>
       </header>
 
@@ -141,6 +157,7 @@ export default function App() {
               <th>Character</th>
               <th>Stance</th>
               <th>Zone</th>
+              <th>Level</th>
               <th>Build</th>
               <th>Rupture</th>
               <th>Seen Time / Rupture</th>
@@ -151,6 +168,7 @@ export default function App() {
             {players.map((player, idx) => {
               const rowKey = `${player.account}-${player.character}`;
               const skillMods = player.skillMods ?? {};
+              const equipment = player.equipment ?? {};
               const dungeonEntries = sortedDungeons(player);
               return (
                 <tr key={rowKey}>
@@ -167,8 +185,9 @@ export default function App() {
                     {player.character}
                     {player.isOnline && <span className="online-dot" title="Online now" />}
                   </td>
-                  <td>{player.stance}</td>
+                  <td>{stanceDisplayName(player.stance)}</td>
                   <td>{player.zone || '-'}</td>
+                  <td>{player.buildScore}</td>
                   <td>
                     <button
                       className="badge"
@@ -184,10 +203,23 @@ export default function App() {
                         <ul>
                           {Object.entries(skillMods).map(([slot, value]) => (
                             <li key={slot}>
-                              <span>{slot}:</span> {value || 'n/a'}
+                              <span>{slot}:</span> {sanitizeDisplayString(value ?? '') || 'n/a'}
                             </li>
                           ))}
                         </ul>
+                        {Object.keys(equipment).length > 0 && (
+                          <>
+                            <strong>Equipment</strong>
+                            <ul>
+                              {Object.entries(equipment).map(([slot, value]) => (
+                                <li key={slot}>
+                                  <span>{EQUIPMENT_SLOT_LABELS[slot] ?? slot}:</span>{' '}
+                                  {sanitizeDisplayString(value ?? '') || 'n/a'}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
                       </div>
                     )}
                   </td>
