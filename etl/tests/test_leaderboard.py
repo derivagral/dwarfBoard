@@ -256,15 +256,15 @@ class LeaderboardPipelineTests(unittest.TestCase):
 
 
     def test_build_leaderboard_rows_tracks_is_online(self) -> None:
-        """Players in the latest snapshot should be marked is_online=True."""
+        """Players with isOnline=true in the latest snapshot should be marked is_online=True."""
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
                 json.dumps(
                     {
                         "entries": [
-                            {"account": "A", "character": "C1", "rupture": 50, "score": 800},
-                            {"account": "B", "character": "C2", "rupture": 30, "score": 600},
+                            {"account": "A", "character": "C1", "rupture": 50, "score": 800, "isOnline": True},
+                            {"account": "B", "character": "C2", "rupture": 30, "score": 600, "isOnline": True},
                         ]
                     }
                 ),
@@ -274,7 +274,8 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 json.dumps(
                     {
                         "entries": [
-                            {"account": "A", "character": "C1", "rupture": 55, "score": 850},
+                            {"account": "A", "character": "C1", "rupture": 55, "score": 850, "isOnline": True},
+                            {"account": "B", "character": "C2", "rupture": 30, "score": 600, "isOnline": False},
                         ]
                     }
                 ),
@@ -292,6 +293,28 @@ class LeaderboardPipelineTests(unittest.TestCase):
         by_account = {row["account"]: row for row in rows}
         self.assertTrue(by_account["A"]["is_online"])
         self.assertFalse(by_account["B"]["is_online"])
+
+    def test_build_leaderboard_rows_is_online_false_when_field_missing(self) -> None:
+        """Players without an isOnline field should default to is_online=False."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
+                json.dumps(
+                    {
+                        "entries": [
+                            {"account": "A", "character": "C1", "rupture": 50, "score": 800},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = build_leaderboard_rows(
+                [tmp_path / "leaderboard_20260301T100000Z_aaa.json"],
+                interval_minutes=10,
+            )
+
+        self.assertFalse(rows[0]["is_online"])
 
     def test_compute_seen_minutes_uses_timestamp_deltas(self) -> None:
         """seen_minutes should be the sum of actual deltas, not count * interval."""

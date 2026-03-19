@@ -312,16 +312,19 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
                 if dname not in record.dungeon_first_seen and snapshot_ts:
                     record.dungeon_first_seen[dname] = snapshot_ts
 
-    # Determine which players appear in the most recent snapshot for is_online
-    latest_players: set[tuple[str, str]] = set()
-    if snapshot_paths:
-        latest_payload = json.loads(snapshot_paths[-1].read_text(encoding="utf-8"))
+    # Determine online status from the most recent snapshot's isOnline field
+    sorted_paths = sorted(snapshot_paths)
+    online_players: set[tuple[str, str]] = set()
+    if sorted_paths:
+        latest_payload = json.loads(sorted_paths[-1].read_text(encoding="utf-8"))
         for entry in _extract_entries(latest_payload):
             acct = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "")
             char = _as_str(entry.get("character") or entry.get("character_name"), "")
             if not acct and not char:
                 acct, char = _split_name(entry.get("name"))
-            latest_players.add((acct or "unknown", char or "unknown"))
+            is_online_raw = entry.get("isOnline") or entry.get("is_online")
+            if is_online_raw is True or (isinstance(is_online_raw, str) and is_online_raw.lower() in ("true", "1", "yes")):
+                online_players.add((acct or "unknown", char or "unknown"))
 
     rows: list[dict[str, Any]] = []
     for key, record in sorted(players.items(), key=lambda item: (-item[1].rupture_level, -item[1].build_score, item[0][0])):
@@ -351,7 +354,7 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
                 "skill_modifier_count": record.dominant_skill_count,
                 "skill_mods": build_profiles.get(key, {}),
                 "equipment": record.equipment,
-                "is_online": key in latest_players,
+                "is_online": key in online_players,
                 "zone": record.zone,
                 "last_seen_at": record.last_seen_at,
                 "dungeons": dict(sorted(
