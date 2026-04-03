@@ -1,0 +1,8 @@
+# Leaderboard snapshots: JSON that changes incrementally.
+# Git's delta compression handles this well by default, but marking
+# them explicitly ensures packfile heuristics treat them as text diffs.
+etl/data/raw/**/*.json text diff
+etl/data/raw/**/*.meta.json text diff
+
+# Generated aggregated payload — also diffable
+client/public/leaderboard.json text diff linguist-generated
