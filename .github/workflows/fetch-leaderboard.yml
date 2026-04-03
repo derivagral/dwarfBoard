@@ -96,6 +96,44 @@ jobs:
             ls -1t "$dir"leaderboard_*.meta.json 2>/dev/null | tail -n +1009 | xargs -r rm --
           done
 
+      - name: Prune snapshots from previous seasons
+        run: |
+          python3 -c "
+          import json
+          from pathlib import Path
+
+          raw_dir = Path('${{ steps.config.outputs.output_dir }}')
+          for variant_dir in sorted(raw_dir.iterdir()):
+              if not variant_dir.is_dir():
+                  continue
+              snapshots = sorted(
+                  p for p in variant_dir.glob('leaderboard_*.json')
+                  if not p.name.endswith('.meta.json')
+              )
+              if not snapshots:
+                  continue
+              try:
+                  current = json.loads(snapshots[-1].read_text()).get('seasonId')
+              except Exception:
+                  continue
+              if not current:
+                  continue
+              pruned = 0
+              for snap in snapshots[:-1]:
+                  try:
+                      sid = json.loads(snap.read_text()).get('seasonId')
+                  except Exception:
+                      continue
+                  if sid and sid != current:
+                      snap.unlink()
+                      meta = snap.with_name(snap.stem + '.meta.json')
+                      if meta.exists():
+                          meta.unlink()
+                      pruned += 1
+              if pruned:
+                  print(f'  [{variant_dir.name}] Pruned {pruned} snapshot(s) from season {sid} (current: {current})')
+          "
+
       - name: Save snapshot cache
         uses: actions/cache/save@v4
         with:
