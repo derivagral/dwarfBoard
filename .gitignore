@@ -210,5 +210,5 @@ __marimo__/
 node_modules/
 *.tsbuildinfo
 
-# Local ETL fetch snapshots
-etl/data/raw/
+# Local ETL intermediate files (CSVs, temp)
+etl/data/*.csv

@@ -22,6 +22,9 @@ on:
         required: false
         default: "etl/data/raw"
 
+permissions:
+  contents: write
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -29,6 +32,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history not needed, but we need to push back
+          fetch-depth: 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -59,14 +65,6 @@ jobs:
 
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "output_dir=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
-
-      - name: Restore cached snapshots
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.config.outputs.output_dir }}
-          key: snapshots-v1-${{ github.run_id }}
-          restore-keys: |
-            snapshots-v1-
 
       - name: Fetch all variant snapshots
         run: |
@@ -134,15 +132,24 @@ jobs:
                   print(f'  [{variant_dir.name}] Pruned {pruned} snapshot(s) from season {sid} (current: {current})')
           "
 
-      - name: Save snapshot cache
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ steps.config.outputs.output_dir }}
-          key: snapshots-v1-${{ github.run_id }}
+      - name: Commit and push snapshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload fetched artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: leaderboard-snapshots
-          path: ${{ steps.config.outputs.output_dir }}/
-          if-no-files-found: error
+          OUTPUT_DIR="${{ steps.config.outputs.output_dir }}"
+          git add "$OUTPUT_DIR"
+
+          # Only commit if there are actual changes (deduped snapshots may be identical)
+          if git diff --cached --quiet; then
+            echo "No new snapshot data — skipping commit."
+          else
+            TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            # Summarize what changed
+            ADDED=$(git diff --cached --numstat "$OUTPUT_DIR" | awk '{a+=$1} END{print a+0}')
+            DELETED=$(git diff --cached --numstat "$OUTPUT_DIR" | awk '{d+=$2} END{print d+0}')
+            git commit -m "data: leaderboard snapshot ${TIMESTAMP}
+
+          +${ADDED}/-${DELETED} lines across $(git diff --cached --name-only | wc -l) files"
+            git push
+          fi
