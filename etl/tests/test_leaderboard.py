@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from dwarfboard_etl.leaderboard import _compute_seen_minutes, _sanitize_display_str, build_leaderboard_rows, reconcile_variant_transitions, run_leaderboard_pipeline
+from dwarfboard_etl.leaderboard import _compute_seen_minutes, _extract_season_id, _sanitize_display_str, build_leaderboard_rows, reconcile_variant_transitions, run_leaderboard_pipeline
 
 
 class LeaderboardPipelineTests(unittest.TestCase):
@@ -37,8 +37,9 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+            season_id, rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
 
+        self.assertEqual(season_id, "s1")
         self.assertEqual(len(rows), 1)
         row = rows[0]
         self.assertEqual(row["account"], "Asharita")
@@ -104,7 +105,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows(
+            _, rows = build_leaderboard_rows(
                 [
                     tmp_path / "leaderboard_20260301T100000Z_aaa.json",
                     tmp_path / "leaderboard_20260301T101000Z_bbb.json",
@@ -147,7 +148,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+            _, rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
 
         row = rows[0]
         self.assertEqual(row["dungeons"]["zul"], 1)
@@ -194,7 +195,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+            _, rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
 
         row = rows[0]
         self.assertEqual(len(row["dungeons"]), 18)
@@ -239,7 +240,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows(
+            _, rows = build_leaderboard_rows(
                 [
                     tmp_path / "leaderboard_20260301T100000Z_aaa.json",
                     tmp_path / "leaderboard_20260302T100000Z_bbb.json",
@@ -282,7 +283,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows(
+            _, rows = build_leaderboard_rows(
                 [
                     tmp_path / "leaderboard_20260301T100000Z_aaa.json",
                     tmp_path / "leaderboard_20260302T100000Z_bbb.json",
@@ -309,7 +310,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows(
+            _, rows = build_leaderboard_rows(
                 [tmp_path / "leaderboard_20260301T100000Z_aaa.json"],
                 interval_minutes=10,
             )
@@ -338,7 +339,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 json.dumps({"entries": [{"account": "A", "character": "C", "rupture": 50, "score": 800}]}),
                 encoding="utf-8",
             )
-            rows = build_leaderboard_rows([tmp_path / "leaderboard_20260301T100000Z_aaa.json"], interval_minutes=10)
+            _, rows = build_leaderboard_rows([tmp_path / "leaderboard_20260301T100000Z_aaa.json"], interval_minutes=10)
         self.assertEqual(rows[0]["seen_minutes_estimate"], -1)
         self.assertEqual(rows[0]["seen_time_per_rupture"], -1)
 
@@ -365,7 +366,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+            _, rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
 
         stance_by_char = {row["character"]: row["stance"] for row in rows}
         self.assertEqual(stance_by_char["Bow"], "bow")
@@ -393,7 +394,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
             (snapshots_dir / "latest.json").write_text("{}", encoding="utf-8")
 
             output = tmp_path / "leaderboard.csv"
-            rows = run_leaderboard_pipeline(snapshots_dir, output, interval_minutes=60)
+            _, rows = run_leaderboard_pipeline(snapshots_dir, output, interval_minutes=60)
 
             self.assertEqual(len(rows), 1)
             with output.open("r", encoding="utf-8") as handle:
@@ -466,7 +467,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+            _, rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
 
         row = rows[0]
         eq = row["equipment"]
@@ -504,7 +505,7 @@ class LeaderboardPipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
+            _, rows = build_leaderboard_rows([tmp_path / "s1.json"], interval_minutes=60)
 
         eq = rows[0]["equipment"]
         # Non-English amulet and helmet should be filtered out
@@ -526,6 +527,90 @@ class LeaderboardPipelineTests(unittest.TestCase):
     def test_sanitize_display_str_empty_and_whitespace(self) -> None:
         self.assertEqual(_sanitize_display_str(""), "")
         self.assertEqual(_sanitize_display_str("   "), "")
+
+    def test_extract_season_id_from_dict(self) -> None:
+        self.assertEqual(_extract_season_id({"seasonId": "s1", "entries": []}), "s1")
+        self.assertEqual(_extract_season_id({"seasonId": "s2"}), "s2")
+
+    def test_extract_season_id_missing_or_invalid(self) -> None:
+        self.assertEqual(_extract_season_id({"entries": []}), "unknown")
+        self.assertEqual(_extract_season_id([1, 2, 3]), "unknown")
+        self.assertEqual(_extract_season_id({"seasonId": ""}), "unknown")
+        self.assertEqual(_extract_season_id({"seasonId": 123}), "unknown")
+
+    def test_build_leaderboard_rows_filters_cross_season_snapshots(self) -> None:
+        """Snapshots from a previous season should be excluded during aggregation."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            # Old season snapshot: player at rupture 200
+            (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
+                json.dumps(
+                    {
+                        "seasonId": "s1",
+                        "entries": [
+                            {"account": "A", "character": "C", "rupture": 200, "score": 1500},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # New season snapshot: same player resets to rupture 10
+            (tmp_path / "leaderboard_20260308T100000Z_bbb.json").write_text(
+                json.dumps(
+                    {
+                        "seasonId": "s2",
+                        "entries": [
+                            {"account": "A", "character": "C", "rupture": 10, "score": 100},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            season_id, rows = build_leaderboard_rows(
+                [
+                    tmp_path / "leaderboard_20260301T100000Z_aaa.json",
+                    tmp_path / "leaderboard_20260308T100000Z_bbb.json",
+                ],
+                interval_minutes=10,
+            )
+
+        # Should use the latest season and ignore s1 data
+        self.assertEqual(season_id, "s2")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["rupture_level"], 10)  # NOT 200 from old season
+        self.assertEqual(rows[0]["build_score"], 100)
+
+    def test_build_leaderboard_rows_aggregates_unknown_seasons_together(self) -> None:
+        """Snapshots without seasonId should all aggregate together."""
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "leaderboard_20260301T100000Z_aaa.json").write_text(
+                json.dumps(
+                    {"entries": [{"account": "A", "character": "C", "rupture": 50, "score": 800}]}
+                ),
+                encoding="utf-8",
+            )
+            (tmp_path / "leaderboard_20260301T101000Z_bbb.json").write_text(
+                json.dumps(
+                    {"entries": [{"account": "A", "character": "C", "rupture": 60, "score": 900}]}
+                ),
+                encoding="utf-8",
+            )
+
+            season_id, rows = build_leaderboard_rows(
+                [
+                    tmp_path / "leaderboard_20260301T100000Z_aaa.json",
+                    tmp_path / "leaderboard_20260301T101000Z_bbb.json",
+                ],
+                interval_minutes=10,
+            )
+
+        self.assertEqual(season_id, "unknown")
+        self.assertEqual(len(rows), 1)
+        # Both snapshots should be aggregated (max rupture)
+        self.assertEqual(rows[0]["rupture_level"], 60)
+        self.assertEqual(rows[0]["snapshots_seen"], 2)
 
 
 if __name__ == "__main__":

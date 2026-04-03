@@ -73,6 +73,7 @@ export default function App() {
     hardcore_fellowship: [],
   });
   const [loadFailed, setLoadFailed] = useState(false);
+  const [seasonId, setSeasonId] = useState<string | null>(null);
   const [openClearsKey, setOpenClearsKey] = useState<string | null>(null);
   const [openBuildKey, setOpenBuildKey] = useState<string | null>(null);
 
@@ -92,6 +93,10 @@ export default function App() {
         }
 
         if (!isPayloadWithVariants(payload)) throw new Error('unexpected leaderboard payload shape');
+
+        if (typeof payload.seasonId === 'string') {
+          setSeasonId(payload.seasonId);
+        }
 
         const normalizedVariants: Record<LeaderboardVariantKey, LeaderboardPlayer[]> = {
           solo: normalizeRows(payload.variants.solo ?? []),
@@ -125,7 +130,7 @@ export default function App() {
   return (
     <main className="page">
       <header className="header">
-        <h1>dwarfBoard Leaderboard</h1>
+        <h1>dwarfBoard Leaderboard{seasonId && <span className="subtle"> &mdash; Season {seasonId.replace(/^s/i, '')}</span>}</h1>
         <p>Base view includes Level, Build, Rupture, and Seen Time / Rupture. Click clears/build badges for details.</p>
         <p className="subtle">{sourceLabel}</p>
       </header>

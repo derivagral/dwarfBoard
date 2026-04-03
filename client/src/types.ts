@@ -42,6 +42,7 @@ export interface LeaderboardPlayer {
 }
 
 export interface LeaderboardPayload {
+  seasonId?: string;
   generatedAt?: string;
   variants: Record<LeaderboardVariantKey, LeaderboardPlayer[]>;
 }

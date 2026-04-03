@@ -48,6 +48,15 @@ class LeaderboardRecord:
     snapshot_timestamps: list[str] = field(default_factory=list)
 
 
+def _extract_season_id(payload: Any) -> str:
+    """Extract the seasonId from a raw API payload, defaulting to ``"unknown"``."""
+    if isinstance(payload, dict):
+        raw = payload.get("seasonId")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return "unknown"
+
+
 def _extract_entries(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, list):
         return [row for row in payload if isinstance(row, dict)]
@@ -229,18 +238,37 @@ def _compute_seen_minutes(snapshot_timestamps: list[str], interval_minutes: int)
     return round(total_seconds / 60, 2)
 
 
-def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 10) -> list[dict[str, Any]]:
-    """Aggregate leaderboard snapshots into player-centric rows."""
+def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 10) -> tuple[str, list[dict[str, Any]]]:
+    """Aggregate leaderboard snapshots into player-centric rows.
+
+    Returns ``(season_id, rows)`` where *season_id* is the season detected
+    from the most recent snapshot (used to filter out cross-season data).
+    """
 
     players: dict[tuple[str, str], LeaderboardRecord] = {}
     build_profiles: dict[tuple[str, str], dict[str, str]] = {}
 
     ts_pattern = re.compile(r"leaderboard_(\d{8}T\d{6}Z)")
 
-    for path in sorted(snapshot_paths):
+    # Determine the current season from the most recent snapshot so we can
+    # skip stale snapshots that belong to a previous season.
+    sorted_snapshot_paths = sorted(snapshot_paths)
+    current_season = "unknown"
+    if sorted_snapshot_paths:
+        latest_payload = json.loads(sorted_snapshot_paths[-1].read_text(encoding="utf-8"))
+        current_season = _extract_season_id(latest_payload)
+
+    for path in sorted_snapshot_paths:
         ts_match = ts_pattern.search(path.stem)
         snapshot_ts = ts_match.group(1) if ts_match else ""
         payload = json.loads(path.read_text(encoding="utf-8"))
+
+        # Skip snapshots from a different season to avoid cross-season
+        # data corruption (e.g. stale high rupture levels after a reset).
+        snapshot_season = _extract_season_id(payload)
+        if current_season != "unknown" and snapshot_season != "unknown" and snapshot_season != current_season:
+            continue
+
         entries = _extract_entries(payload)
         for entry in entries:
             account = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "")
@@ -313,10 +341,9 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
                     record.dungeon_first_seen[dname] = snapshot_ts
 
     # Determine online status from the most recent snapshot's isOnline field
-    sorted_paths = sorted(snapshot_paths)
     online_players: set[tuple[str, str]] = set()
-    if sorted_paths:
-        latest_payload = json.loads(sorted_paths[-1].read_text(encoding="utf-8"))
+    if sorted_snapshot_paths:
+        latest_payload = json.loads(sorted_snapshot_paths[-1].read_text(encoding="utf-8"))
         for entry in _extract_entries(latest_payload):
             acct = _as_str(entry.get("account") or entry.get("account_name") or entry.get("user"), "")
             char = _as_str(entry.get("character") or entry.get("character_name"), "")
@@ -369,10 +396,11 @@ def build_leaderboard_rows(snapshot_paths: list[Path], interval_minutes: int = 1
             }
         )
 
-    return rows
+    return current_season, rows
 
 
-def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, interval_minutes: int = 10) -> list[dict[str, Any]]:
+def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, interval_minutes: int = 10) -> tuple[str, list[dict[str, Any]]]:
+    """Run the full pipeline and return ``(season_id, rows)``."""
     source_dir = Path(snapshots_dir)
     destination = Path(output_csv)
 
@@ -381,7 +409,7 @@ def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, 
         for path in source_dir.glob("*.json")
         if path.name != "latest.json" and not path.name.endswith(".meta.json")
     ]
-    rows = build_leaderboard_rows(snapshot_paths, interval_minutes=interval_minutes)
+    season_id, rows = build_leaderboard_rows(snapshot_paths, interval_minutes=interval_minutes)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
@@ -410,7 +438,7 @@ def run_leaderboard_pipeline(snapshots_dir: str | Path, output_csv: str | Path, 
         writer.writeheader()
         writer.writerows(rows)
 
-    return rows
+    return season_id, rows
 
 
 def reconcile_variant_transitions(

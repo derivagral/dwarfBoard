@@ -38,7 +38,7 @@ def _has_snapshots(directory: Path) -> bool:
     )
 
 
-def _build_variant(key: str, query: dict[str, str], snapshots_base: Path) -> list[dict[str, object]]:
+def _build_variant(key: str, query: dict[str, str], snapshots_base: Path) -> tuple[str, list[dict[str, object]]]:
     """Build rows for a single variant, fetching live only if no local snapshots exist."""
     variant_dir = snapshots_base / key
     csv_path = Path("etl/data") / f"leaderboard_{key}.csv"
@@ -58,20 +58,26 @@ def main() -> None:
     Path("etl/data").mkdir(parents=True, exist_ok=True)
 
     snapshots_base = Path("etl/data/raw")
-    payload: dict[str, dict[str, list[dict[str, object]]]] = {"variants": {}}
+    payload: dict[str, object] = {"variants": {}}
     errors: list[str] = []
+    detected_season: str | None = None
 
     for key, query in VARIANTS.items():
         try:
-            rows = _build_variant(key, query, snapshots_base)
-            payload["variants"][key] = rows
-            print(f"  [{key}] {len(rows)} rows")
+            season_id, rows = _build_variant(key, query, snapshots_base)
+            payload["variants"][key] = rows  # type: ignore[index]
+            if detected_season is None and season_id != "unknown":
+                detected_season = season_id
+            print(f"  [{key}] {len(rows)} rows (season={season_id})")
         except Exception as exc:
             print(f"  [{key}] FAILED: {exc}", file=sys.stderr)
             errors.append(key)
-            payload["variants"][key] = []
+            payload["variants"][key] = []  # type: ignore[index]
 
-    reconcile_variant_transitions(payload["variants"])
+    reconcile_variant_transitions(payload["variants"])  # type: ignore[arg-type]
+
+    if detected_season:
+        payload["seasonId"] = detected_season
 
     out_path = Path("client/public/leaderboard.json")
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
