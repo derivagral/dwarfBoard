@@ -1,11 +1,11 @@
 {
   "url": "http://loadbalancer-prod-1ac6c83-453346156.us-east-1.elb.amazonaws.com/leaderboards/scores/?fellowship=false&hardcore=false",
   "status_code": 200,
-  "fetched_at": "20260505T184509Z",
-  "sha256": "58c2ef9cc999bfbb6fffca8f7baf2288f35dd17356a3789f6530ae23f20b4b9b",
+  "fetched_at": "20260505T191610Z",
+  "sha256": "a4165c5b8e6ff7d3591c2566d6856a48dbbe628cd0c780a5cae5e30df857eb0f",
   "content_type": "application/json; charset=utf-8",
-  "etag": "W/\"634a6-DQPuxA5lpVnacsMY+ag7l/8I7lg\"",
+  "etag": "W/\"634af-hqgp4SycRY7+G/S9nVbbPcsxWaU\"",
   "last_modified": null,
-  "body_file": "leaderboard_20260505T184509Z_58c2ef9cc999.json",
-  "body_size": 406694
+  "body_file": "leaderboard_20260505T191610Z_a4165c5b8e6f.json",
+  "body_size": 406703
 }
